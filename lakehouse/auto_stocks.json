@@ -1,0 +1,911 @@
+{
+  "source": "中证指数有限公司官网成分股名单：930607 中证汽车指数（A股整车+零部件100只）+ 931239 中证港股通汽车产业主题指数（港股通50只），已关联 cn_stocks.json 的 orgId 与 hk_stock_connect.json 的 nameEn",
+  "url": [
+    "https://www.csindex.com.cn/#/indices/family/detail?indexCode=930607",
+    "https://www.csindex.com.cn/#/indices/family/detail?indexCode=931239"
+  ],
+  "fetchDate": "2026-08-20",
+  "count": 150,
+  "stocks": [
+    {
+      "code": "000559",
+      "name": "万向钱潮",
+      "orgId": "gssz0000559",
+      "market": "cn"
+    },
+    {
+      "code": "000572",
+      "name": "海马汽车",
+      "orgId": "gssz0000572",
+      "market": "cn"
+    },
+    {
+      "code": "000581",
+      "name": "威孚高科",
+      "orgId": "gssz0000581",
+      "market": "cn"
+    },
+    {
+      "code": "000625",
+      "name": "长安汽车",
+      "orgId": "gssz0000625",
+      "market": "cn"
+    },
+    {
+      "code": "000700",
+      "name": "模塑科技",
+      "orgId": "gssz0000700",
+      "market": "cn"
+    },
+    {
+      "code": "000887",
+      "name": "中鼎股份",
+      "orgId": "gssz0000887",
+      "market": "cn"
+    },
+    {
+      "code": "000901",
+      "name": "航天科技",
+      "orgId": "gssz0000901",
+      "market": "cn"
+    },
+    {
+      "code": "001233",
+      "name": "海安集团",
+      "orgId": "9900059058",
+      "market": "cn"
+    },
+    {
+      "code": "001285",
+      "name": "瑞立科密",
+      "orgId": "gfbj0833321",
+      "market": "cn"
+    },
+    {
+      "code": "001311",
+      "name": "多利科技",
+      "orgId": "9900052515",
+      "market": "cn"
+    },
+    {
+      "code": "002048",
+      "name": "宁波华翔",
+      "orgId": "gssz0002048",
+      "market": "cn"
+    },
+    {
+      "code": "002085",
+      "name": "万丰奥威",
+      "orgId": "9900001341",
+      "market": "cn"
+    },
+    {
+      "code": "002101",
+      "name": "广东鸿图",
+      "orgId": "9900001761",
+      "market": "cn"
+    },
+    {
+      "code": "002126",
+      "name": "银轮股份",
+      "orgId": "9900002661",
+      "market": "cn"
+    },
+    {
+      "code": "002190",
+      "name": "成飞集成",
+      "orgId": "9900003903",
+      "market": "cn"
+    },
+    {
+      "code": "002239",
+      "name": "奥特佳",
+      "orgId": "9900004648",
+      "market": "cn"
+    },
+    {
+      "code": "002265",
+      "name": "建设工业",
+      "orgId": "9900005074",
+      "market": "cn"
+    },
+    {
+      "code": "002284",
+      "name": "亚太股份",
+      "orgId": "9900007913",
+      "market": "cn"
+    },
+    {
+      "code": "002434",
+      "name": "万里扬",
+      "orgId": "9900012932",
+      "market": "cn"
+    },
+    {
+      "code": "002472",
+      "name": "双环传动",
+      "orgId": "9900014368",
+      "market": "cn"
+    },
+    {
+      "code": "002488",
+      "name": "金固股份",
+      "orgId": "9900015174",
+      "market": "cn"
+    },
+    {
+      "code": "002516",
+      "name": "旷达科技",
+      "orgId": "9900016207",
+      "market": "cn"
+    },
+    {
+      "code": "002536",
+      "name": "飞龙股份",
+      "orgId": "9900016931",
+      "market": "cn"
+    },
+    {
+      "code": "002537",
+      "name": "海联金汇",
+      "orgId": "9900016929",
+      "market": "cn"
+    },
+    {
+      "code": "002540",
+      "name": "亚太科技",
+      "orgId": "9900017117",
+      "market": "cn"
+    },
+    {
+      "code": "002553",
+      "name": "南方精工",
+      "orgId": "9900018065",
+      "market": "cn"
+    },
+    {
+      "code": "002594",
+      "name": "比亚迪",
+      "orgId": "gshk0001211",
+      "market": "cn"
+    },
+    {
+      "code": "002664",
+      "name": "信质集团",
+      "orgId": "9900022159",
+      "market": "cn"
+    },
+    {
+      "code": "002703",
+      "name": "浙江世宝",
+      "orgId": "gshk0008331",
+      "market": "cn"
+    },
+    {
+      "code": "002765",
+      "name": "蓝黛科技",
+      "orgId": "9900023682",
+      "market": "cn"
+    },
+    {
+      "code": "002906",
+      "name": "华阳集团",
+      "orgId": "9900030637",
+      "market": "cn"
+    },
+    {
+      "code": "002920",
+      "name": "德赛西威",
+      "orgId": "9900032987",
+      "market": "cn"
+    },
+    {
+      "code": "002965",
+      "name": "祥鑫科技",
+      "orgId": "9900030905",
+      "market": "cn"
+    },
+    {
+      "code": "002984",
+      "name": "森麒麟",
+      "orgId": "9900037009",
+      "market": "cn"
+    },
+    {
+      "code": "300100",
+      "name": "双林股份",
+      "orgId": "9900012868",
+      "market": "cn"
+    },
+    {
+      "code": "300304",
+      "name": "云意电气",
+      "orgId": "9900021923",
+      "market": "cn"
+    },
+    {
+      "code": "300432",
+      "name": "富临精工",
+      "orgId": "9900023937",
+      "market": "cn"
+    },
+    {
+      "code": "300446",
+      "name": "航天智造",
+      "orgId": "9900023852",
+      "market": "cn"
+    },
+    {
+      "code": "300580",
+      "name": "贝斯特",
+      "orgId": "9900029950",
+      "market": "cn"
+    },
+    {
+      "code": "300680",
+      "name": "隆盛科技",
+      "orgId": "9900031828",
+      "market": "cn"
+    },
+    {
+      "code": "300695",
+      "name": "兆丰股份",
+      "orgId": "9900031469",
+      "market": "cn"
+    },
+    {
+      "code": "300893",
+      "name": "松原安全",
+      "orgId": "9900039861",
+      "market": "cn"
+    },
+    {
+      "code": "300926",
+      "name": "博俊科技",
+      "orgId": "9900039855",
+      "market": "cn"
+    },
+    {
+      "code": "300969",
+      "name": "恒帅股份",
+      "orgId": "nssc1000136",
+      "market": "cn"
+    },
+    {
+      "code": "301000",
+      "name": "肇民科技",
+      "orgId": "nssc1000306",
+      "market": "cn"
+    },
+    {
+      "code": "301005",
+      "name": "超捷股份",
+      "orgId": "nssc1000561",
+      "market": "cn"
+    },
+    {
+      "code": "301225",
+      "name": "恒勃股份",
+      "orgId": "gfbj0834165",
+      "market": "cn"
+    },
+    {
+      "code": "301488",
+      "name": "豪恩汽电",
+      "orgId": "9900041807",
+      "market": "cn"
+    },
+    {
+      "code": "301535",
+      "name": "浙江华远",
+      "orgId": "9900052553",
+      "market": "cn"
+    },
+    {
+      "code": "301550",
+      "name": "斯菱智驱",
+      "orgId": "gfbj0832147",
+      "market": "cn"
+    },
+    {
+      "code": "301600",
+      "name": "慧翰股份",
+      "orgId": "9900030451",
+      "market": "cn"
+    },
+    {
+      "code": "301631",
+      "name": "壹连科技",
+      "orgId": "9900053341",
+      "market": "cn"
+    },
+    {
+      "code": "301656",
+      "name": "联合动力",
+      "orgId": "9900062008",
+      "market": "cn"
+    },
+    {
+      "code": "301667",
+      "name": "纳百川",
+      "orgId": "9900059714",
+      "market": "cn"
+    },
+    {
+      "code": "600006",
+      "name": "东风股份",
+      "orgId": "gssh0600006",
+      "market": "cn"
+    },
+    {
+      "code": "600066",
+      "name": "宇通客车",
+      "orgId": "gssh0600066",
+      "market": "cn"
+    },
+    {
+      "code": "600104",
+      "name": "上汽集团",
+      "orgId": "gssh0600104",
+      "market": "cn"
+    },
+    {
+      "code": "600166",
+      "name": "福田汽车",
+      "orgId": "gssh0600166",
+      "market": "cn"
+    },
+    {
+      "code": "600335",
+      "name": "国机汽车",
+      "orgId": "gssh0600335",
+      "market": "cn"
+    },
+    {
+      "code": "600480",
+      "name": "凌云股份",
+      "orgId": "gssh0600480",
+      "market": "cn"
+    },
+    {
+      "code": "600651",
+      "name": "飞乐音响",
+      "orgId": "gssh0600651",
+      "market": "cn"
+    },
+    {
+      "code": "600660",
+      "name": "福耀玻璃",
+      "orgId": "gssh0600660",
+      "market": "cn"
+    },
+    {
+      "code": "600686",
+      "name": "金龙汽车",
+      "orgId": "gssh0600686",
+      "market": "cn"
+    },
+    {
+      "code": "600699",
+      "name": "均胜电子",
+      "orgId": "gssh0600699",
+      "market": "cn"
+    },
+    {
+      "code": "600733",
+      "name": "北汽蓝谷",
+      "orgId": "gssh0600733",
+      "market": "cn"
+    },
+    {
+      "code": "600741",
+      "name": "华域汽车",
+      "orgId": "gssh0600741",
+      "market": "cn"
+    },
+    {
+      "code": "600933",
+      "name": "爱柯迪",
+      "orgId": "gfbj0834393",
+      "market": "cn"
+    },
+    {
+      "code": "601058",
+      "name": "赛轮轮胎",
+      "orgId": "9900009410",
+      "market": "cn"
+    },
+    {
+      "code": "601127",
+      "name": "赛力斯",
+      "orgId": "9900024265",
+      "market": "cn"
+    },
+    {
+      "code": "601238",
+      "name": "广汽集团",
+      "orgId": "9900006006",
+      "market": "cn"
+    },
+    {
+      "code": "601633",
+      "name": "长城汽车",
+      "orgId": "gshk0002333",
+      "market": "cn"
+    },
+    {
+      "code": "601689",
+      "name": "拓普集团",
+      "orgId": "9900023677",
+      "market": "cn"
+    },
+    {
+      "code": "601799",
+      "name": "星宇股份",
+      "orgId": "9900017668",
+      "market": "cn"
+    },
+    {
+      "code": "601966",
+      "name": "玲珑轮胎",
+      "orgId": "9900023113",
+      "market": "cn"
+    },
+    {
+      "code": "603009",
+      "name": "北特科技",
+      "orgId": "9900022982",
+      "market": "cn"
+    },
+    {
+      "code": "603013",
+      "name": "亚普股份",
+      "orgId": "9900023758",
+      "market": "cn"
+    },
+    {
+      "code": "603040",
+      "name": "新坐标",
+      "orgId": "9900029981",
+      "market": "cn"
+    },
+    {
+      "code": "603049",
+      "name": "中策橡胶",
+      "orgId": "9900005872",
+      "market": "cn"
+    },
+    {
+      "code": "603119",
+      "name": "浙江荣泰",
+      "orgId": "9900053442",
+      "market": "cn"
+    },
+    {
+      "code": "603166",
+      "name": "福达股份",
+      "orgId": "9900023112",
+      "market": "cn"
+    },
+    {
+      "code": "603179",
+      "name": "新泉股份",
+      "orgId": "9900030577",
+      "market": "cn"
+    },
+    {
+      "code": "603202",
+      "name": "天有为",
+      "orgId": "9900059219",
+      "market": "cn"
+    },
+    {
+      "code": "603305",
+      "name": "旭升集团",
+      "orgId": "9900032571",
+      "market": "cn"
+    },
+    {
+      "code": "603306",
+      "name": "华懋科技",
+      "orgId": "9900029307",
+      "market": "cn"
+    },
+    {
+      "code": "603319",
+      "name": "美湖股份",
+      "orgId": "9900028874",
+      "market": "cn"
+    },
+    {
+      "code": "603352",
+      "name": "至信股份",
+      "orgId": "9900063089",
+      "market": "cn"
+    },
+    {
+      "code": "603358",
+      "name": "华达科技",
+      "orgId": "9900029980",
+      "market": "cn"
+    },
+    {
+      "code": "603376",
+      "name": "大明电子",
+      "orgId": "9900057471",
+      "market": "cn"
+    },
+    {
+      "code": "603418",
+      "name": "友升股份",
+      "orgId": "9900046966",
+      "market": "cn"
+    },
+    {
+      "code": "603596",
+      "name": "伯特利",
+      "orgId": "gfbj0835470",
+      "market": "cn"
+    },
+    {
+      "code": "603730",
+      "name": "岱美股份",
+      "orgId": "9900023136",
+      "market": "cn"
+    },
+    {
+      "code": "603786",
+      "name": "科博达",
+      "orgId": "DR0000117",
+      "market": "cn"
+    },
+    {
+      "code": "603809",
+      "name": "豪能股份",
+      "orgId": "9900023062",
+      "market": "cn"
+    },
+    {
+      "code": "603950",
+      "name": "长源东谷",
+      "orgId": "9900037311",
+      "market": "cn"
+    },
+    {
+      "code": "603997",
+      "name": "继峰股份",
+      "orgId": "9900023694",
+      "market": "cn"
+    },
+    {
+      "code": "605133",
+      "name": "嵘泰股份",
+      "orgId": "9900039741",
+      "market": "cn"
+    },
+    {
+      "code": "605333",
+      "name": "沪光股份",
+      "orgId": "9900038389",
+      "market": "cn"
+    },
+    {
+      "code": "688326",
+      "name": "经纬恒润",
+      "orgId": "9900048779",
+      "market": "cn"
+    },
+    {
+      "code": "688612",
+      "name": "威迈斯",
+      "orgId": "9900039720",
+      "market": "cn"
+    },
+    {
+      "code": "688800",
+      "name": "瑞可达",
+      "orgId": "gfbj0831274",
+      "market": "cn"
+    },
+    {
+      "code": "00175",
+      "name": "吉利汽车",
+      "market": "hk",
+      "nameEn": "GEELY AUTO"
+    },
+    {
+      "code": "00179",
+      "name": "德昌电机控股",
+      "market": "hk",
+      "nameEn": "JOHNSON ELEC H"
+    },
+    {
+      "code": "00425",
+      "name": "敏实集团",
+      "market": "hk",
+      "nameEn": "MINTH GROUP"
+    },
+    {
+      "code": "00470",
+      "name": "先导智能",
+      "market": "hk",
+      "nameEn": "WUXI LEAD"
+    },
+    {
+      "code": "00501",
+      "name": "豪威集团",
+      "market": "hk",
+      "nameEn": "OMNIVISION"
+    },
+    {
+      "code": "00564",
+      "name": "中创智领",
+      "market": "hk",
+      "nameEn": "ZCZL"
+    },
+    {
+      "code": "00666",
+      "name": "瑞浦兰钧",
+      "market": "hk",
+      "nameEn": "REPT BATTERO"
+    },
+    {
+      "code": "00699",
+      "name": "均胜电子",
+      "market": "hk",
+      "nameEn": "JOYSON ELEC"
+    },
+    {
+      "code": "00800",
+      "name": "文远知行－Ｗ",
+      "market": "hk",
+      "nameEn": "WERIDE-W"
+    },
+    {
+      "code": "00868",
+      "name": "信义玻璃",
+      "market": "hk",
+      "nameEn": "XINYI GLASS"
+    },
+    {
+      "code": "00881",
+      "name": "中升控股",
+      "market": "hk",
+      "nameEn": "ZHONGSHENG HLDG"
+    },
+    {
+      "code": "01057",
+      "name": "浙江世宝",
+      "market": "hk",
+      "nameEn": "ZHEJIANG SHIBAO"
+    },
+    {
+      "code": "01114",
+      "name": "",
+      "market": "hk",
+      "nameEn": "BRILLIANCE CHI"
+    },
+    {
+      "code": "01211",
+      "name": "比亚迪股份",
+      "market": "hk",
+      "nameEn": "BYD COMPANY"
+    },
+    {
+      "code": "01304",
+      "name": "",
+      "market": "hk",
+      "nameEn": "FORTIOR"
+    },
+    {
+      "code": "01316",
+      "name": "耐世特",
+      "market": "hk",
+      "nameEn": "NEXTEER"
+    },
+    {
+      "code": "01772",
+      "name": "赣锋锂业",
+      "market": "hk",
+      "nameEn": "GANFENGLITHIUM"
+    },
+    {
+      "code": "01810",
+      "name": "小米集团－Ｗ",
+      "market": "hk",
+      "nameEn": "XIAOMI-W"
+    },
+    {
+      "code": "02015",
+      "name": "理想汽车－Ｗ",
+      "market": "hk",
+      "nameEn": "LI AUTO-W"
+    },
+    {
+      "code": "02026",
+      "name": "小马智行－Ｗ",
+      "market": "hk",
+      "nameEn": "PONY-W"
+    },
+    {
+      "code": "02050",
+      "name": "三花智控",
+      "market": "hk",
+      "nameEn": "SANHUA"
+    },
+    {
+      "code": "02238",
+      "name": "广汽集团",
+      "market": "hk",
+      "nameEn": "GAC GROUP"
+    },
+    {
+      "code": "02333",
+      "name": "长城汽车",
+      "market": "hk",
+      "nameEn": "GWMOTOR"
+    },
+    {
+      "code": "02338",
+      "name": "潍柴动力",
+      "market": "hk",
+      "nameEn": "WEICHAI POWER"
+    },
+    {
+      "code": "02382",
+      "name": "舜宇光学科技",
+      "market": "hk",
+      "nameEn": "SUNNY OPTICAL"
+    },
+    {
+      "code": "02402",
+      "name": "亿华通",
+      "market": "hk",
+      "nameEn": "SINOHYTEC"
+    },
+    {
+      "code": "02431",
+      "name": "佑驾创新",
+      "market": "hk",
+      "nameEn": "MINIEYE"
+    },
+    {
+      "code": "02465",
+      "name": "龙蟠科技",
+      "market": "hk",
+      "nameEn": "LOPAL TECH"
+    },
+    {
+      "code": "02473",
+      "name": "喜相逢集团",
+      "market": "hk",
+      "nameEn": "XXF"
+    },
+    {
+      "code": "02498",
+      "name": "速腾聚创",
+      "market": "hk",
+      "nameEn": "ROBOSENSE"
+    },
+    {
+      "code": "02525",
+      "name": "禾赛－Ｗ",
+      "market": "hk",
+      "nameEn": "HESAI-W"
+    },
+    {
+      "code": "02533",
+      "name": "黑芝麻智能",
+      "market": "hk",
+      "nameEn": "BLACK SESAME"
+    },
+    {
+      "code": "02570",
+      "name": "重塑能源",
+      "market": "hk",
+      "nameEn": "REFIRE"
+    },
+    {
+      "code": "02582",
+      "name": "国富氢能",
+      "market": "hk",
+      "nameEn": "GUOFUHEE"
+    },
+    {
+      "code": "02650",
+      "name": "挚达科技",
+      "market": "hk",
+      "nameEn": "ZHIDA TECH"
+    },
+    {
+      "code": "02665",
+      "name": "图达通",
+      "market": "hk",
+      "nameEn": "SEYOND"
+    },
+    {
+      "code": "02889",
+      "name": "博泰车联",
+      "market": "hk",
+      "nameEn": "PATEO"
+    },
+    {
+      "code": "03606",
+      "name": "福耀玻璃",
+      "market": "hk",
+      "nameEn": "FUYAO GLASS"
+    },
+    {
+      "code": "03677",
+      "name": "正力新能",
+      "market": "hk",
+      "nameEn": "ZENERGY"
+    },
+    {
+      "code": "03750",
+      "name": "宁德时代",
+      "market": "hk",
+      "nameEn": "CATL"
+    },
+    {
+      "code": "03808",
+      "name": "中国重汽",
+      "market": "hk",
+      "nameEn": "SINOTRUK"
+    },
+    {
+      "code": "03881",
+      "name": "希迪智驾",
+      "market": "hk",
+      "nameEn": "CIDI"
+    },
+    {
+      "code": "03931",
+      "name": "中创新航",
+      "market": "hk",
+      "nameEn": "CALB"
+    },
+    {
+      "code": "09660",
+      "name": "地平线机器人－Ｗ",
+      "market": "hk",
+      "nameEn": "HORIZONROBOT-W"
+    },
+    {
+      "code": "09690",
+      "name": "途虎－Ｗ",
+      "market": "hk",
+      "nameEn": "TUHU-W"
+    },
+    {
+      "code": "09696",
+      "name": "天齐锂业",
+      "market": "hk",
+      "nameEn": "TIANQI LITHIUM"
+    },
+    {
+      "code": "09863",
+      "name": "零跑汽车",
+      "market": "hk",
+      "nameEn": "LEAPMOTOR"
+    },
+    {
+      "code": "09868",
+      "name": "小鹏集团－Ｗ",
+      "market": "hk",
+      "nameEn": "XPENG-W"
+    },
+    {
+      "code": "09927",
+      "name": "赛力斯",
+      "market": "hk",
+      "nameEn": "SERES"
+    },
+    {
+      "code": "09973",
+      "name": "奇瑞汽车",
+      "market": "hk",
+      "nameEn": "CHERY AUTO"
+    }
+  ]
+}
