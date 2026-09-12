@@ -1,0 +1,33 @@
+[project]
+name = "cagent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "dspy>=3.3.1",
+    "pillow>=12.3.0",
+    "pypdfium2>=5.12.1",
+    "requests>=2.34.2",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["cagent*"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.3",
+    "ty>=0.0.73",
+]
+
+[tool.ruff.lint]
+ignore = [
+    # 批量抓取/OCR/agent 长循环：故意 catch-all 记录后继续，不让单条失败中断整批
+    "BLE001",
+    # 本项目只处理日历日（公告日期），不涉及时刻，naive datetime 是有意为之
+    "DTZ001", "DTZ005", "DTZ006", "DTZ007",
+]

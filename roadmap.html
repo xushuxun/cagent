@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>商业化演进路线</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
+    background: #0b1020;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    background-image:
+      radial-gradient(ellipse 60% 50% at 15% 0%, rgba(64, 120, 255, .18), transparent),
+      radial-gradient(ellipse 50% 40% at 90% 100%, rgba(0, 210, 190, .12), transparent);
+  }
+
+  .slide {
+    width: 100%;
+    max-width: 1480px;
+  }
+
+  /* ---------- header ---------- */
+  .header { text-align: center; margin-bottom: 64px; }
+  .header .kicker {
+    display: inline-block;
+    font-size: 14px;
+    letter-spacing: 6px;
+    color: #5eead4;
+    border: 1px solid rgba(94, 234, 212, .35);
+    border-radius: 999px;
+    padding: 6px 20px 6px 26px;
+    margin-bottom: 22px;
+  }
+  .header h1 {
+    font-size: 52px;
+    font-weight: 800;
+    color: #f4f7ff;
+    letter-spacing: 2px;
+  }
+  .header h1 em {
+    font-style: normal;
+    background: linear-gradient(90deg, #6ea8ff, #5eead4);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .header p {
+    margin-top: 14px;
+    font-size: 18px;
+    color: #8b96b3;
+    letter-spacing: 1px;
+  }
+
+  /* ---------- timeline ---------- */
+  .timeline {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 28px;
+  }
+
+  /* rising connector curve */
+  .curve {
+    position: absolute;
+    left: -2%; right: -2%;
+    top: -30px;
+    width: 104%;
+    height: 120px;
+    pointer-events: none;
+  }
+
+  .card {
+    position: relative;
+    background: linear-gradient(165deg, rgba(255,255,255,.07), rgba(255,255,255,.02));
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 22px;
+    padding: 30px 26px 26px;
+    backdrop-filter: blur(6px);
+    transition: transform .25s ease, border-color .25s ease;
+  }
+  .card:hover { transform: translateY(-6px); border-color: rgba(110,168,255,.45); }
+
+  /* staggered rise */
+  .card:nth-child(2) { margin-top: 66px; }
+  .card:nth-child(3) { margin-top: 44px; }
+  .card:nth-child(4) { margin-top: 22px; }
+  .card:nth-child(5) { margin-top: 0; }
+
+  .phase-no {
+    position: absolute;
+    top: -26px;
+    left: 24px;
+    width: 52px; height: 52px;
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; font-weight: 800; color: #0b1020;
+    box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  }
+  .card:nth-child(2) .phase-no { background: linear-gradient(135deg, #93b8ff, #6ea8ff); }
+  .card:nth-child(3) .phase-no { background: linear-gradient(135deg, #7dd3fc, #38bdf8); }
+  .card:nth-child(4) .phase-no { background: linear-gradient(135deg, #5eead4, #2dd4bf); }
+  .card:nth-child(5) .phase-no { background: linear-gradient(135deg, #fcd34d, #f59e0b); }
+
+  .phase-time {
+    font-size: 13px;
+    color: #7c88a6;
+    letter-spacing: 1px;
+    margin: 14px 0 8px;
+  }
+  .phase-title {
+    font-size: 23px;
+    font-weight: 700;
+    color: #eef2fc;
+    margin-bottom: 4px;
+  }
+  .phase-sub {
+    font-size: 14px;
+    color: #5eead4;
+    margin-bottom: 16px;
+    letter-spacing: .5px;
+  }
+  .phase-points {
+    list-style: none;
+    font-size: 14.5px;
+    line-height: 1.75;
+    color: #aab4cd;
+  }
+  .phase-points li { padding-left: 16px; position: relative; margin-bottom: 6px; }
+  .phase-points li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 11px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #6ea8ff;
+  }
+
+  .metric {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px dashed rgba(255,255,255,.12);
+    font-size: 13px;
+    color: #8b96b3;
+  }
+  .metric b { color: #fcd34d; font-weight: 600; }
+
+  /* ---------- footer ---------- */
+  .footer {
+    margin-top: 72px;
+    text-align: center;
+  }
+  .footer .tagline {
+    font-size: 26px;
+    font-weight: 700;
+    color: #dfe6f7;
+    letter-spacing: 3px;
+  }
+  .footer .tagline em {
+    font-style: normal;
+    background: linear-gradient(90deg, #fcd34d, #5eead4);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .footer .sub {
+    margin-top: 12px;
+    font-size: 14px;
+    color: #6b7592;
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+  <div class="slide">
+
+    <div class="header">
+      <div class="kicker">ROADMAP</div>
+      <h1>商业化演进路线 · <em>需求牵引，稳步扩张</em></h1>
+      <p>让用户的每一次购买，成为下一步扩张的指挥棒</p>
+    </div>
+
+    <div class="timeline">
+      <svg class="curve" viewBox="0 0 1200 120" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="g" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0" stop-color="#6ea8ff" stop-opacity=".1"/>
+            <stop offset="1" stop-color="#fcd34d" stop-opacity=".9"/>
+          </linearGradient>
+        </defs>
+        <path d="M 0 115 Q 600 110 1200 5" fill="none" stroke="url(#g)" stroke-width="2.5" stroke-dasharray="1 0"/>
+        <path d="M 1186 12 L 1200 5 L 1190 20" fill="none" stroke="#fcd34d" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+
+      <div class="card">
+        <div class="phase-no">1</div>
+        <div class="phase-time">当前 → 2 个月</div>
+        <div class="phase-title">免费精品</div>
+        <div class="phase-sub">建立口碑</div>
+        <ul class="phase-points">
+          <li>精选知名公司，免费开放深度报告</li>
+          <li>核心卖点：每个数字可溯源到年报原文</li>
+          <li>证明「有人愿意花时间读我们」</li>
+        </ul>
+        <div class="metric">衡量标准 · <b>阅读时长 / 分享率 / 订阅数</b></div>
+      </div>
+
+      <div class="card">
+        <div class="phase-no">2</div>
+        <div class="phase-time">2 → 6 个月</div>
+        <div class="phase-title">开始收费</div>
+        <div class="phase-sub">跑通生意</div>
+        <ul class="phase-points">
+          <li>单篇付费 + 订阅制双轨变现</li>
+          <li>「求购」排队：只为已验证的需求投入</li>
+          <li>排队与扩容都有量化纪律</li>
+        </ul>
+        <div class="metric">衡量标准 · <b>收入覆盖运营成本</b></div>
+      </div>
+
+      <div class="card">
+        <div class="phase-no">3</div>
+        <div class="phase-time">6 → 12 个月</div>
+        <div class="phase-title">一份投入</div>
+        <div class="phase-sub">多份产出</div>
+        <ul class="phase-points">
+          <li>行业横评免费引流，沉淀资产开始复利</li>
+          <li>交叉检验报告：找出管理层叙事的矛盾</li>
+          <li>覆盖越广，对比越强，护城河越深</li>
+        </ul>
+        <div class="metric">衡量标准 · <b>新产品边际成本趋近于零</b></div>
+      </div>
+
+      <div class="card">
+        <div class="phase-no">4</div>
+        <div class="phase-time">12 个月 +</div>
+        <div class="phase-title">产业链全景</div>
+        <div class="phase-sub">用赚来的钱扩张</div>
+        <ul class="phase-points">
+          <li>数百家公司连成供应 / 客户 / 竞争图谱</li>
+          <li>机构投资者级别的分析能力普惠化</li>
+          <li>扩张时机由收入规模决定</li>
+        </ul>
+        <div class="metric">衡量标准 · <b>收入支撑 2-3 倍产能</b></div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="tagline">用最好的单点赢得信任，用信任指引扩张，<em>用积累的资产构筑无法复制的深度</em></div>
+      <div class="sub">每个阶段都能独立成立 · 收入永远跑在投入前面</div>
+    </div>
+
+  </div>
+</body>
+</html>
