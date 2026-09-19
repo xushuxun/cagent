@@ -1,6 +1,4 @@
-"""年报爬虫`。
-
-模式一：单只检索/下载（--stock 与 --market 均必填）
+"""年报爬虫。
 
     # 下载单只股票年报（默认近 5 年）
     uv run cagent/scraper/cli.py --stock 09863 --market hk
@@ -9,12 +7,11 @@
     # 只打印检索结果 JSON，不下载
     uv run cagent/scraper/cli.py --stock 09863 --market hk --search
 
-模式二：批量下载（--list 指定股票池 JSON，--market 忽略）
-
+    # 批量下载：按股票池 JSON（每条自带 market），分片、强制覆盖
     uv run cagent/scraper/cli.py --list lakehouse/auto_stocks.json
     uv run cagent/scraper/cli.py --list lakehouse/auto_stocks.json --offset 10 --limit 20 --force
 
-股票池 JSON 格式：顶层对象取 stocks 数组，每条标的市场不同必填字段不同——
+股票池 JSON 格式：顶层对象取 stocks 数组，每条标的必填 code 和 market——
 
     {
       "stocks": [
@@ -23,9 +20,6 @@
       ]
     }
 
-    code    股票代码（字符串，保留前导零），两个市场都必填
-    market  cn / hk，必填（缺失或非法直接报错）
-    name    显示名，可选（仅日志用）
     orgId   巨潮搜索参数，cn 建议填（缺了回退只传 code，搜索可能不准）；hk 不需要
     nameEn  港股英文名，可选（当前未使用）
 
@@ -98,29 +92,32 @@ def group_by_market(stocks: list[dict]) -> dict[str, list[dict]]:
     return {m: groups[m] for m in ("cn", "hk") if m in groups}
 
 
-parser = argparse.ArgumentParser(
-    description="公告下载：单只检索/下载（--stock + --market）或批量下载（--list 自定义名单）")
-parser.add_argument("--stock", default="",
-                    help="股票代码（单只模式必填），如 09863、600519")
-parser.add_argument("--market", choices=["cn", "hk"], default="",
-                    help="单只模式必填 cn/hk；批量模式忽略")
-parser.add_argument("--search", action="store_true",
-                    help="单只模式：只打印检索结果 JSON，不下载")
-parser.add_argument("--list", dest="list_file", default="",
-                    help="自定义股票池 JSON（每条含 market: cn/hk，如 lakehouse/auto_stocks.json）")
-parser.add_argument("--from", dest="date_from", default="",
-                    help="起始日期 YYYY-MM-DD（默认：各爬虫内置，近5年）")
-parser.add_argument("--to", dest="date_to", default="", help="结束日期 YYYY-MM-DD（默认：今天）")
-parser.add_argument("--output", default=str(Path(__file__).resolve().parents[2] / ".cagent"),
-                    help="lakehouse 根目录（默认 <仓库根>/.cagent）")
-parser.add_argument("--offset", type=int, default=0, help="每个市场内从第 N 只开始（0 起），用于分片")
-parser.add_argument("--limit", type=int, default=0,
-                    help="每个市场内最多处理 N 只，0=全部；配合 --offset 分片")
-parser.add_argument("--force", action="store_true",
-                    help="覆盖已有 PDF 并清理多余文件（透传给爬虫）")
-args = parser.parse_args()
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="公告下载：单只检索/下载（--stock + --market）或批量下载（--list 自定义名单）")
+    parser.add_argument("--stock", default="",
+                        help="股票代码（单只模式必填），如 09863、600519")
+    parser.add_argument("--market", choices=["cn", "hk"], default="",
+                        help="单只模式必填 cn/hk；批量模式忽略")
+    parser.add_argument("--search", action="store_true",
+                        help="单只模式：只打印检索结果 JSON，不下载")
+    parser.add_argument("--list", dest="list_file", default="",
+                        help="自定义股票池 JSON（每条含 market: cn/hk，如 lakehouse/auto_stocks.json）")
+    parser.add_argument("--from", dest="date_from", default="",
+                        help="起始日期 YYYY-MM-DD（默认：各爬虫内置，近5年）")
+    parser.add_argument("--to", dest="date_to", default="", help="结束日期 YYYY-MM-DD（默认：今天）")
+    parser.add_argument("--output", default=str(Path(__file__).resolve().parents[2] / ".cagent"),
+                        help="lakehouse 根目录（默认 <仓库根>/.cagent）")
+    parser.add_argument("--offset", type=int, default=0, help="每个市场内从第 N 只开始（0 起），用于分片")
+    parser.add_argument("--limit", type=int, default=0,
+                        help="每个市场内最多处理 N 只，0=全部；配合 --offset 分片")
+    parser.add_argument("--force", action="store_true",
+                        help="覆盖已有 PDF 并清理多余文件（透传给爬虫）")
+    return parser
 
-if args.stock:
+
+def run_single(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    """单只模式：--search 只打印检索 JSON，否则下载。"""
     if args.market not in SCRAPERS:
         parser.error("单只模式要求 --market 指定 cn 或 hk")
     market = args.market
@@ -134,26 +131,41 @@ if args.stock:
     else:
         SCRAPERS[market](args.stock, Path(args.output), args.date_from, args.date_to,
                          force=args.force)
-    sys.exit(0)
+    return 0
 
-if not args.list_file:
-    parser.error("批量模式要求 --list 指定股票池 JSON（单只模式用 --stock + --market）")
-stocks = json.loads(Path(args.list_file).read_text(encoding="utf-8"))["stocks"]
-todo = group_by_market(stocks)
-log.info("自定义股票池 %s: %s", args.list_file, {m: len(s) for m, s in todo.items()})
 
-failed_all: dict[str, list[str]] = {}
-try:
-    for m, stocks in todo.items():
-        failed_all[m] = download_stocks(m, stocks, args.date_from, args.date_to,
-                                        Path(args.output), args.offset, args.limit, args.force)
-except KeyboardInterrupt:
-    log.warning("收到中断，已停止（重跑同一命令即可断点续跑）")
-    sys.exit(130)
+def run_batch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    """批量模式：读股票池 → 按市场分组 → 逐市场下载 → 汇总失败。"""
+    if not args.list_file:
+        parser.error("批量模式要求 --list 指定股票池 JSON（单只模式用 --stock + --market）")
+    stocks = json.loads(Path(args.list_file).read_text(encoding="utf-8"))["stocks"]
+    todo = group_by_market(stocks)
+    log.info("自定义股票池 %s: %s", args.list_file, {m: len(s) for m, s in todo.items()})
+
+    failed_all: dict[str, list[str]] = {}
+    try:
+        for m, group in todo.items():
+            failed_all[m] = download_stocks(m, group, args.date_from, args.date_to,
+                                            Path(args.output), args.offset, args.limit, args.force)
+    except KeyboardInterrupt:
+        log.warning("收到中断，已停止（重跑同一命令即可断点续跑）")
+        return 130
 
     total_failed = sum(len(v) for v in failed_all.values())
     if total_failed:
         log.warning("全部完成，共 %d 只股票失败: %s", total_failed,
                     {m: v for m, v in failed_all.items() if v})
-        sys.exit(1)
+        return 1
     log.info("全部完成，无失败")
+    return 0
+
+
+def main() -> int:
+    """workflow：解析参数 → 单只/批量分派。"""
+    parser = build_parser()
+    args = parser.parse_args()
+    return run_single(args, parser) if args.stock else run_batch(args, parser)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

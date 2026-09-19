@@ -5,13 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "opencv-python-headless>=5.0.0.93",
+    "httpx2>=2.13.0",
     "pillow>=12.3.0",
     "pypdfium2>=5.12.1",
     "requests>=2.34.2",
-    "torch>=2.9",
-    "torchvision>=0.24",
-    "transformers>=5.0",
 ]
 
 [dependency-groups]

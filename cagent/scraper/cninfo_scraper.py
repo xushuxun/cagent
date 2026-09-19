@@ -2,26 +2,26 @@ r"""CNInfo Annual Report Scraper - 巨潮资讯网A股年报检索与下载（�
 
 直接调用巨潮资讯网公开 JSON API（按年报分类服务端过滤），无需浏览器。
 进度日志输出到 stderr。CLI 入口在本包 cli.py
-（`uv run python cagent/scraper/cli.py --stock <code> --market cn`），本模块只提供
+（`uv run cagent/scraper/cli.py --stock <code> --market cn`），本模块只提供
 函数：search_filings（检索）/ download_stock（单只下载）。
 """
 
 import json
 import logging
 import re
-import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S",
-    stream=sys.stderr,
+from cagent.scraper.lakehouse_index import (
+    atomic_write,
+    cleanup_orphans,
+    parse_date,
+    upsert_index,
 )
+
 log: logging.Logger = logging.getLogger("cninfo")
 
 CNINFO_SEARCH_URL = "https://www.cninfo.com.cn/new/hisAnnouncement/query"
@@ -32,7 +32,7 @@ CNINFO_PDF_BASE = "https://static.cninfo.com.cn/"
 # 批量下载时每只股票一个子进程，进程内缓存挡不住反复拉取，故优先读本地文件。
 LOCAL_STOCK_LIST = Path(__file__).resolve().parent.parent.parent / "lakehouse" / "cn_stocks.json"
 
-# Rate limit: 1.5s between requests (cninfo is aggressive on rate limiting)
+# 请求间隔 1.5s：巨潮对限速抓得很紧
 REQUEST_INTERVAL = 1.5
 
 DEFAULT_HEADERS = {
@@ -55,15 +55,11 @@ def is_annual_report(title: str) -> bool:
     return "年度报告" in title and "摘要" not in title and "英文" not in title
 
 
-# ---------------------------------------------------------------------------
-# Stock code -> orgId mapping
-# ---------------------------------------------------------------------------
-
 _stock_cache: dict[str, dict] | None = None
 
 
 def _load_stock_list() -> dict[str, dict]:
-    """Load stock list with orgId, preferring the local lakehouse copy; falls back to cninfo API."""
+    """加载股票代码 -> orgId 映射，优先读本地 lakehouse 副本，没有再拉巨潮 API。"""
     global _stock_cache
     if _stock_cache is not None:
         return _stock_cache
@@ -113,19 +109,15 @@ def _load_stock_list() -> dict[str, dict]:
 
 
 def _build_stock_param(code: str) -> str:
-    """Build the stock parameter value: 'code,orgId' format required by cninfo API."""
+    """拼巨潮 API 的 stock 参数：要求 'code,orgId' 格式，查不到 orgId 就只传 code。"""
     info = _load_stock_list().get(code.strip())
     if info and info.get("orgId"):
         return f"{info['code']},{info['orgId']}"
     return code
 
 
-# ---------------------------------------------------------------------------
-# API: Fetch announcements
-# ---------------------------------------------------------------------------
-
 def fetch_annual_reports(stock: str, date_from: str, date_to: str) -> list[dict]:
-    """Fetch annual report announcements from cninfo (server-side category filter)."""
+    """拉取年报公告（服务端按年报分类过滤）。"""
     se_date = f"{date_from}~{date_to}"
     all_announcements = []
     page_num = 1
@@ -134,7 +126,7 @@ def fetch_annual_reports(stock: str, date_from: str, date_to: str) -> list[dict]
         payload = {
             "pageNum": str(page_num),
             "pageSize": "30",
-            "column": "szse",
+            "column": "szse",  # 巨潮全站检索的历史沿用值
             "tabName": "fulltext",
             "plate": "",
             "stock": _build_stock_param(stock),
@@ -205,11 +197,6 @@ def fetch_annual_reports(stock: str, date_from: str, date_to: str) -> list[dict]
     return all_announcements
 
 
-def parse_date(s: str) -> datetime | None:
-    """解析 YYYY-MM-DD 日期。"""
-    return datetime.strptime(s, "%Y-%m-%d") if s else None
-
-
 def search_filings(stock_code: str, date_from: datetime | None = None,
                    date_to: datetime | None = None) -> list[dict]:
     """搜索年报元数据（服务端按年报分类过滤，再按标题排除摘要/英文版）。"""
@@ -239,60 +226,7 @@ def search_filings(stock_code: str, date_from: datetime | None = None,
     return kept
 
 
-def atomic_write(path: Path, data: bytes):
-    """先写临时文件再改名，避免进程中断留下半截文件。"""
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_bytes(data)
-    tmp.replace(path)
-
-
-def upsert_index(company_dir: Path, market: str, code: str, name: str, entry: dict):
-    """向公司 index.json 插入/更新一条公告条目，保持 filings 按日期升序。
-
-    增量安全：合并而非替换已有条目，保留本地额外字段（如手工批注）；原子写防损坏。
-    """
-    idx_path = company_dir / "index.json"
-    if idx_path.exists():
-        index = json.loads(idx_path.read_text(encoding="utf-8"))
-    else:
-        index = {"market": market, "stockCode": code, "stockName": name, "filings": []}
-    filings = []
-    for r in index["filings"]:
-        if not isinstance(r, dict):
-            continue  # 跳过脏数据
-        if r["file"] == entry["file"]:
-            entry = {**r, **entry}  # 新数据覆盖同名字段，本地额外字段保留
-            continue
-        filings.append(r)
-    filings.append(entry)
-    filings.sort(key=lambda r: r["announcementDate"] if r.get("announcementDate") else "")
-    index["filings"] = filings
-    atomic_write(idx_path, (json.dumps(index, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
-
-
-def _cleanup_orphans(company_dir: Path, expected_filenames: set[str]) -> int:
-    """删除本地多余 PDF 文件并更新 index.json，返回删除数量。"""
-    idx_path = company_dir / "index.json"
-    index = json.loads(idx_path.read_text(encoding="utf-8")) if idx_path.exists() else None
-    removed = 0
-    for f in list(company_dir.iterdir()):
-        if f.is_dir() or f.name == "index.json":
-            continue
-        if f.name not in expected_filenames:
-            f.unlink()
-            removed += 1
-            log.info("  删除多余文件: %s", f.name)
-    if index and removed:
-        before = len(index.get("filings", []))
-        index["filings"] = [r for r in index["filings"] if r.get("file") in expected_filenames]
-        after = len(index["filings"])
-        if after < before:
-            atomic_write(idx_path, (json.dumps(index, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
-            log.info("  index.json 已清理 %d 条旧条目", before - after)
-    return removed
-
-
-def download_filings(filings: list[dict], root: Path, market: str = "cn", force: bool = False):
+def download_filings(filings: list[dict], root: Path, market: str, force: bool = False):
     """按 lakehouse 规范（仓库 lakehouse/README.md）串行下载年报 PDF 并维护 index.json。
 
     增量安全（默认）：不覆盖已有 PDF、不删本地条目、合并保留本地额外字段；
@@ -326,7 +260,7 @@ def download_filings(filings: list[dict], root: Path, market: str = "cn", force:
         path = company_dir / filename
 
         entry = {
-            "announcementDate": ann_date,
+            "date": ann_date,
             "title": f["title"],
             "file": filename,
             "link": pdf_url,
@@ -375,7 +309,7 @@ def download_filings(filings: list[dict], root: Path, market: str = "cn", force:
     if force and filings:
         sec_code = filings[0].get("secCode", "unknown")
         company_dir = root / market / sec_code
-        removed = _cleanup_orphans(company_dir, expected_filenames)
+        removed = cleanup_orphans(company_dir, expected_filenames)
         if removed:
             log.info("已清理 %d 个多余 PDF 文件", removed)
 
@@ -394,5 +328,4 @@ def download_stock(stock_code: str, output: Path, date_from: str = "", date_to: 
         date_to=parse_date(date_to),
     )
     log.info("共找到 %d 条年报", len(filings))
-    download_filings(filings, output, force=force)
-
+    download_filings(filings, output, "cn", force=force)

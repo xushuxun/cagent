@@ -2,25 +2,25 @@ r"""HKEx Annual Report Scraper — 港交所披露易年报检索与下载（库
 
 直接调用港交所未公开 JSON API（按年报分类服务端过滤），无需浏览器。
 进度日志输出到 stderr。CLI 入口在本包 cli.py
-（`uv run python cagent/scraper/cli.py --stock <code> --market hk`），本模块只提供
+（`uv run cagent/scraper/cli.py --stock <code> --market hk`），本模块只提供
 函数：search_filings（检索）/ download_stock（单只下载）。
 """
 
 import json
 import logging
 import re
-import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S",
-    stream=sys.stderr,
+from cagent.scraper.lakehouse_index import (
+    atomic_write,
+    cleanup_orphans,
+    parse_date,
+    upsert_index,
 )
+
 log: logging.Logger = logging.getLogger("hkex")
 
 # 港交所披露易站点常量
@@ -49,8 +49,7 @@ def is_annual_report(title: str) -> bool:
     tl = t.lower()
     if not t:
         return True
-    if any(k in t for k in ("摘要", "英文", "English", "Abridged")) \
-            or any(k in tl for k in ("english", "abridged")):
+    if "english" in tl or "abridged" in tl:  # 英文版、节录版，不要
         return False
     return (any(k in t for k in ("年報", "年报", "年度報告", "年度报告"))
             or "annual report" in tl)
@@ -72,20 +71,18 @@ def parse_record(rec: dict) -> dict:
         "title": clean(rec.get("TITLE", "")
                        .replace("&#x3b;", ";").replace("&amp;", "&")
                        .replace("&#x2f;", "/").replace("&#x2F;", "/")),
-        "date": (rec.get("DATE_TIME", "").split(" ") or [""])[0],
+        "date": rec.get("DATE_TIME", "").split(" ")[0],
         "link": link,
         "fileType": (rec.get("FILE_TYPE", "") or "").upper(),
         "fileSize": (rec.get("FILE_INFO", "") or "").strip(),
     }
 
 
-def parse_date(s: str) -> datetime | None:
-    """解析 YYYY-MM-DD 日期。"""
-    return datetime.strptime(s, "%Y-%m-%d") if s else None
-
-
 def resolve_stock_id(sess: requests.Session, code: str) -> str:
-    """通过 prefix.do 自动补全接口解析股票代码对应的 stockId；失败返回空串。"""
+    """通过 prefix.do 自动补全接口解析股票代码对应的 stockId；失败返回空串。
+
+    响应是 JSONP（callback(...)）包装，这里剥掉外壳取 JSON；接口改版会直接 ValueError。
+    """
     resp = sess.get(f"{BASE}/search/prefix.do", params={
         "callback": "callback", "lang": "ZH", "type": "A", "name": code, "market": "SEHK",
     }, headers={"Referer": SEARCH}, timeout=30)
@@ -104,8 +101,8 @@ def fetch_filings(sess: requests.Session, frm: str, to: str, stock_id: str) -> l
     """抓取指定日期区间的年报；stockId + 分类代码在服务端精确过滤，直接调 JSON API，无需 JSF 会话。"""
     log.info("抓取区间 %s ~ %s", frm, to)
     out, fetched, total = [], 0, None
+    size = 5000  # 单次请求行数上限；服务端实际返回行数可能更少，靠"行数不再增长"判终止
     while True:
-        size = 5000
         resp = sess.get(API, params={
             "sortDir": "0", "sortByOptions": "DateTime", "category": "0", "market": "SEHK",
             "stockId": stock_id, "documentType": "-1", "fromDate": frm, "toDate": to,
@@ -180,60 +177,7 @@ def iso_date(ddmmyyyy: str) -> str:
     return datetime.strptime(ddmmyyyy, "%d/%m/%Y").strftime("%Y-%m-%d")
 
 
-def atomic_write(path: Path, data: bytes):
-    """先写临时文件再改名，避免进程中断留下半截文件。"""
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_bytes(data)
-    tmp.replace(path)
-
-
-def upsert_index(company_dir: Path, market: str, code: str, name: str, entry: dict):
-    """向公司 index.json 插入/更新一条公告条目，保持 filings 按日期升序。
-
-    增量安全：合并而非替换已有条目，保留本地额外字段（如手工批注）；原子写防损坏。
-    """
-    idx_path = company_dir / "index.json"
-    if idx_path.exists():
-        index = json.loads(idx_path.read_text(encoding="utf-8"))
-    else:
-        index = {"market": market, "stockCode": code, "stockName": name, "filings": []}
-    filings = []
-    for r in index["filings"]:
-        if not isinstance(r, dict):
-            continue  # 跳过脏数据
-        if r["file"] == entry["file"]:
-            entry = {**r, **entry}  # 新数据覆盖同名字段，本地额外字段保留
-            continue
-        filings.append(r)
-    filings.append(entry)
-    filings.sort(key=lambda r: r["date"])
-    index["filings"] = filings
-    atomic_write(idx_path, (json.dumps(index, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
-
-
-def _cleanup_orphans(company_dir: Path, expected_filenames: set[str]) -> int:
-    """删除本地多余 PDF 文件并更新 index.json，返回删除数量。"""
-    idx_path = company_dir / "index.json"
-    index = json.loads(idx_path.read_text(encoding="utf-8")) if idx_path.exists() else None
-    removed = 0
-    for f in list(company_dir.iterdir()):
-        if f.is_dir() or f.name == "index.json":
-            continue
-        if f.name not in expected_filenames:
-            f.unlink()
-            removed += 1
-            log.info("  删除多余文件: %s", f.name)
-    if index and removed:
-        before = len(index.get("filings", []))
-        index["filings"] = [r for r in index["filings"] if r.get("file") in expected_filenames]
-        after = len(index["filings"])
-        if after < before:
-            atomic_write(idx_path, (json.dumps(index, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
-            log.info("  index.json 已清理 %d 条旧条目", before - after)
-    return removed
-
-
-def download_filings(filings: list[dict], root: Path, market: str = "hk", force: bool = False):
+def download_filings(filings: list[dict], root: Path, market: str, force: bool = False):
     """按 lakehouse 规范（仓库 lakehouse/README.md）串行下载年报 PDF 并维护 index.json。
 
     增量安全（默认）：不覆盖已有 PDF、不删本地条目、合并保留本地额外字段；
@@ -292,7 +236,7 @@ def download_filings(filings: list[dict], root: Path, market: str = "hk", force:
     if force and filings:
         code = norm_stock(filings[0]["stockCode"])
         company_dir = root / market / code
-        removed = _cleanup_orphans(company_dir, expected_filenames)
+        removed = cleanup_orphans(company_dir, expected_filenames)
         if removed:
             log.info("已清理 %d 个多余 PDF 文件", removed)
 
@@ -311,5 +255,4 @@ def download_stock(stock_code: str, output: Path, date_from: str = "", date_to: 
         date_to=parse_date(date_to),
     )
     log.info("共找到 %d 条年报", len(filings))
-    download_filings(filings, output, force=force)
-
+    download_filings(filings, output, "hk", force=force)
