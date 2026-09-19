@@ -10,7 +10,9 @@ import json
 import logging
 import re
 import time
+from collections import Counter
 from datetime import datetime, timedelta
+from functools import lru_cache
 from pathlib import Path
 
 import requests
@@ -22,7 +24,7 @@ from cagent.scraper.lakehouse_index import (
     upsert_index,
 )
 
-log: logging.Logger = logging.getLogger("cninfo")
+log = logging.getLogger("cninfo")
 
 CNINFO_SEARCH_URL = "https://www.cninfo.com.cn/new/hisAnnouncement/query"
 CNINFO_STOCK_URL = "https://www.cninfo.com.cn/new/data/szse_stock.json"
@@ -55,178 +57,155 @@ def is_annual_report(title: str) -> bool:
     return "年度报告" in title and "摘要" not in title and "英文" not in title
 
 
-_stock_cache: dict[str, dict] | None = None
-
-
-def _load_stock_list() -> dict[str, dict]:
+@lru_cache(maxsize=1)
+def _stock_list() -> dict[str, dict]:
     """加载股票代码 -> orgId 映射，优先读本地 lakehouse 副本，没有再拉巨潮 API。"""
-    global _stock_cache
-    if _stock_cache is not None:
-        return _stock_cache
-
     if LOCAL_STOCK_LIST.exists():
-        try:
-            data = json.loads(LOCAL_STOCK_LIST.read_text(encoding="utf-8"))
-            _stock_cache = {
-                s["code"].strip(): {"code": s["code"].strip(), "orgId": s.get("orgId", ""), "name": s.get("name", "")}
-                for s in data.get("stocks", []) if s.get("code", "").strip()
-            }
-            log.info("已从本地 %s 加载 %d 只A股", LOCAL_STOCK_LIST.name, len(_stock_cache))
-            return _stock_cache
-        except Exception as e:
-            log.warning("本地股票列表读取失败（%s），回退到 cninfo API", e)
-
+        data = json.loads(LOCAL_STOCK_LIST.read_text(encoding="utf-8"))
+        stocks = {s["code"].strip(): s for s in data.get("stocks", []) if s.get("code", "").strip()}
+        log.info(f"已从本地 {LOCAL_STOCK_LIST.name} 加载 {len(stocks)} 只A股")
+        return stocks
     log.info("加载A股股票列表...")
-    _stock_cache = {}
-
-    try:
-        resp = requests.get(
-            CNINFO_STOCK_URL,
-            headers={
-                "User-Agent": DEFAULT_HEADERS["User-Agent"],
-                "Referer": "https://www.cninfo.com.cn/",
-            },
-            timeout=30,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-
-        for s in data.get("stockList", []):
-            code = s.get("code", "").strip()
-            if code:
-                _stock_cache[code] = {
-                    "code": code,
-                    "orgId": s.get("orgId", ""),
-                    "name": s.get("zwjc", ""),
-                }
-
-        log.info("已加载 %d 只A股", len(_stock_cache))
-
-    except Exception as e:
-        log.warning("股票列表加载失败: %s", e)
-
-    return _stock_cache
+    resp = requests.get(CNINFO_STOCK_URL, timeout=30, headers={
+        "User-Agent": DEFAULT_HEADERS["User-Agent"],
+        "Referer": "https://www.cninfo.com.cn/",
+    })
+    resp.raise_for_status()
+    return {s["code"].strip(): {"orgId": s.get("orgId", ""), "name": s.get("zwjc", "")}
+            for s in resp.json().get("stockList", []) if s.get("code", "").strip()}
 
 
 def _build_stock_param(code: str) -> str:
     """拼巨潮 API 的 stock 参数：要求 'code,orgId' 格式，查不到 orgId 就只传 code。"""
-    info = _load_stock_list().get(code.strip())
-    if info and info.get("orgId"):
-        return f"{info['code']},{info['orgId']}"
-    return code
+    info = _stock_list().get(code.strip(), {})
+    return f"{code},{info['orgId']}" if info.get("orgId") else code
+
+
+def _fetch_page(stock_param: str, se_date: str, page_num: int) -> dict:
+    payload = {
+        "pageNum": str(page_num),
+        "pageSize": "30",
+        "column": "szse",  # 巨潮全站检索的历史沿用值
+        "tabName": "fulltext",
+        "plate": "",
+        "stock": stock_param,
+        "searchkey": "",
+        "secid": "",
+        "category": ANNUAL_REPORT_CATEGORY,
+        "trade": "",
+        "seDate": se_date,
+        "sortName": "",
+        "sortType": "",
+        "isHLtitle": "true",
+    }
+    resp = requests.post(CNINFO_SEARCH_URL, data=payload, headers=DEFAULT_HEADERS, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _parse_announcement(ann: dict) -> dict:
+    """原始公告记录 -> 统一字段：剥掉搜索高亮 <em> 标签，毫秒时间戳转 ISO 日期。"""
+    adjunct_url = ann.get("adjunctUrl", "")
+    ann_time_ms = ann.get("announcementTime", 0)
+    return {
+        "secCode": ann.get("secCode", "").strip(),
+        "secName": re.sub(r"</?em>", "", ann.get("secName", "")).strip(),
+        "title": re.sub(r"</?em>", "", ann.get("announcementTitle", "")).strip(),
+        "announcementDate": datetime.fromtimestamp(ann_time_ms / 1000).strftime("%Y-%m-%d") if ann_time_ms else "",
+        "adjunctUrl": adjunct_url,
+        "adjunctSize": ann.get("adjunctSize", 0),
+        "adjunctType": ann.get("adjunctType", ""),
+        "pdfUrl": f"{CNINFO_PDF_BASE}{adjunct_url}" if adjunct_url else "",
+    }
 
 
 def fetch_annual_reports(stock: str, date_from: str, date_to: str) -> list[dict]:
-    """拉取年报公告（服务端按年报分类过滤）。"""
-    se_date = f"{date_from}~{date_to}"
-    all_announcements = []
-    page_num = 1
+    """拉取年报公告（服务端按年报分类过滤），翻页直到取完。"""
+    stock_param, se_date = _build_stock_param(stock), f"{date_from}~{date_to}"
+    page1 = _fetch_page(stock_param, se_date, 1)
+    total_pages = page1.get("totalpages", 1)
+    log.info(f"共 {page1.get('totalRecordNum', 0)} 条公告，{total_pages} 页")
 
-    while True:
-        payload = {
-            "pageNum": str(page_num),
-            "pageSize": "30",
-            "column": "szse",  # 巨潮全站检索的历史沿用值
-            "tabName": "fulltext",
-            "plate": "",
-            "stock": _build_stock_param(stock),
-            "searchkey": "",
-            "secid": "",
-            "category": ANNUAL_REPORT_CATEGORY,
-            "trade": "",
-            "seDate": se_date,
-            "sortName": "",
-            "sortType": "",
-            "isHLtitle": "true",
-        }
-
-        log.info("请求第 %d 页...", page_num)
-
-        try:
-            resp = requests.post(
-                CNINFO_SEARCH_URL,
-                data=payload,
-                headers=DEFAULT_HEADERS,
-                timeout=30,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-        except Exception as e:
-            log.error("请求失败: %s", e)
-            break
-
-        announcements = data.get("announcements") or []
-        if not announcements:
-            if page_num == 1:
-                log.info("未找到公告")
-            break
-
-        total_pages = data.get("totalpages", 1)
-        if page_num == 1:
-            log.info("共 %d 条公告，%d 页", data.get("totalRecordNum", 0), total_pages)
-
-        for ann in announcements:
-            title = re.sub(r"</?em>", "", ann.get("announcementTitle", "")).strip()
-            ann_time_ms = ann.get("announcementTime", 0)
-
-            ann_date = ""
-            if ann_time_ms:
-                try:
-                    ann_date = datetime.fromtimestamp(ann_time_ms / 1000).strftime("%Y-%m-%d")
-                except (OverflowError, OSError, TypeError, ValueError) as e:
-                    log.debug("公告时间戳解析失败（%s）: %r", e, ann_time_ms)
-
-            adjunct_url = ann.get("adjunctUrl", "")
-            all_announcements.append({
-                "secCode": ann.get("secCode", "").strip(),
-                "secName": re.sub(r"</?em>", "", ann.get("secName", "")).strip(),
-                "title": title,
-                "announcementDate": ann_date,
-                "adjunctUrl": adjunct_url,
-                "adjunctSize": ann.get("adjunctSize", 0),
-                "adjunctType": ann.get("adjunctType", ""),
-                "pdfUrl": f"{CNINFO_PDF_BASE}{adjunct_url}" if adjunct_url else "",
-            })
-
-        if page_num >= total_pages:
-            break
-
-        page_num += 1
+    pages = [page1]
+    for page_num in range(2, total_pages + 1):
         time.sleep(REQUEST_INTERVAL)
+        log.info(f"请求第 {page_num}/{total_pages} 页...")
+        pages.append(_fetch_page(stock_param, se_date, page_num))
 
-    return all_announcements
+    announcements = [a for p in pages for a in p.get("announcements") or []]
+    if not announcements:
+        log.info("未找到公告")
+    return [_parse_announcement(a) for a in announcements]
 
 
 def search_filings(stock_code: str, date_from: datetime | None = None,
                    date_to: datetime | None = None) -> list[dict]:
     """搜索年报元数据（服务端按年报分类过滤，再按标题排除摘要/英文版）。"""
     today = datetime.now()
-    if date_to is None:
-        date_to = today
-    if date_from is None:
-        date_from = today - timedelta(days=5 * 365)
+    date_from, date_to = date_from or today - timedelta(days=5 * 365), date_to or today
+    log.info(f"开始搜索: 股票={stock_code}, 区间 {date_from:%Y-%m-%d} ~ {date_to:%Y-%m-%d}")
 
-    log.info("开始搜索: 股票=%s, 区间 %s ~ %s",
-             stock_code, date_from.strftime("%Y-%m-%d"), date_to.strftime("%Y-%m-%d"))
-
-    announcements = fetch_annual_reports(
-        stock=stock_code,
-        date_from=date_from.strftime("%Y-%m-%d"),
-        date_to=date_to.strftime("%Y-%m-%d"),
-    )
-    log.info("搜索完成，累计命中 %d 条", len(announcements))
-
-    pdf_only = [r for r in announcements if r.get("adjunctType", "").upper() == "PDF"]
-    if len(pdf_only) != len(announcements):
-        log.info("文件类型过滤: 滤除 %d 条非 PDF 结果", len(announcements) - len(pdf_only))
-
-    kept = [r for r in pdf_only if is_annual_report(r["title"])]
-    if len(kept) != len(pdf_only):
-        log.info("年报正文过滤: %d 条中保留 %d 条（滤除摘要/英文版等）", len(pdf_only), len(kept))
+    announcements = fetch_annual_reports(stock_code, date_from.strftime("%Y-%m-%d"),
+                                         date_to.strftime("%Y-%m-%d"))
+    kept = [r for r in announcements
+            if r["adjunctType"].upper() == "PDF" and is_annual_report(r["title"])]
+    log.info(f"搜索完成：命中 {len(announcements)} 条，滤除非 PDF 与摘要/英文版后保留 {len(kept)} 条")
     return kept
 
 
-def download_filings(filings: list[dict], root: Path, market: str, force: bool = False):
+def _filename(f: dict) -> str:
+    """公告文件名：ISO 日期前缀 + 数据源原文件名（见 lakehouse/README.md 命名规则）。"""
+    orig = f.get("adjunctUrl", "").split("/")[-1] or "download.pdf"
+    return f"{f.get('announcementDate', 'nodate')}_{orig}"
+
+
+def _download_one(sess: requests.Session, f: dict, root: Path, market: str,
+                  force: bool, i: int, total: int) -> str:
+    """下载单条公告 PDF 并补登 index 条目，返回 ok/skip/fail。"""
+    if not f.get("pdfUrl"):
+        log.warning(f"[SKIP] 无链接: {f.get('title', '')}")
+        return "fail"
+    sec_code = f.get("secCode", "unknown")
+    company_dir = root / market / sec_code
+    path = company_dir / _filename(f)
+    entry = {
+        "date": f.get("announcementDate", "nodate"),
+        "title": f["title"],
+        "file": path.name,
+        "link": f["pdfUrl"],
+        "fileType": f.get("adjunctType", "PDF"),
+        "fileSize": f.get("adjunctSize", 0),
+        "secCode": sec_code,
+        "secName": f.get("secName", ""),
+    }
+    try:
+        if path.exists() and not force:
+            log.info(f"[SKIP] 已存在: {path}")
+            result = "skip"
+        else:
+            log.info(f"{'覆盖下载' if force and path.exists() else '下载'}第 {i}/{total} 个: {f['title']}")
+            company_dir.mkdir(parents=True, exist_ok=True)
+            resp = sess.get(f["pdfUrl"], timeout=60, headers={
+                "User-Agent": DEFAULT_HEADERS["User-Agent"],
+                "Referer": "https://www.cninfo.com.cn/",
+            })
+            resp.raise_for_status()
+            content_type = resp.headers.get("Content-Type", "")
+            if "pdf" not in content_type.lower() and not resp.content[:5].startswith(b"%PDF"):
+                log.error(f"[FAIL] 不是 PDF: {path.name} (ct={content_type[:30]})")
+                return "fail"
+            atomic_write(path, resp.content)
+            log.info(f"[OK] {path}")
+            time.sleep(REQUEST_INTERVAL)
+            result = "ok"
+        upsert_index(company_dir, market, sec_code, f.get("secName", ""), entry)
+        return result
+    except Exception as e:
+        log.error(f"[FAIL] {f['pdfUrl']}: {e}")
+        return "fail"
+
+
+def download_filings(filings: list[dict], root: Path, market: str, force: bool = False) -> None:
     """按 lakehouse 规范（仓库 lakehouse/README.md）串行下载年报 PDF 并维护 index.json。
 
     增量安全（默认）：不覆盖已有 PDF、不删本地条目、合并保留本地额外字段；
@@ -236,84 +215,16 @@ def download_filings(filings: list[dict], root: Path, market: str, force: bool =
     --force 模式：覆盖已有 PDF 并清理本地多余文件，使本地目录与搜索结果精确同步。
     """
     sess = requests.Session()
-    ok = skip = fail = 0
+    stats = Counter(_download_one(sess, f, root, market, force, i, len(filings))
+                    for i, f in enumerate(filings, 1))
 
-    # 预计算文件名集合，用于 force 模式下的清理
-    expected_filenames: set[str] = set()
-    for f in filings:
-        if f.get("pdfUrl"):
-            orig_name = f.get("adjunctUrl", "").split("/")[-1] or "download.pdf"
-            expected_filenames.add(f"{f.get('announcementDate', 'nodate')}_{orig_name}")
-
-    for i, f in enumerate(filings, 1):
-        pdf_url = f.get("pdfUrl")
-        if not pdf_url:
-            log.warning("[SKIP] 无链接: %s", f.get("title", ""))
-            fail += 1
-            continue
-
-        sec_code = f.get("secCode", "unknown")
-        company_dir = root / market / sec_code
-        orig_name = f.get("adjunctUrl", "").split("/")[-1] or "download.pdf"
-        ann_date = f.get("announcementDate", "nodate")
-        filename = f"{ann_date}_{orig_name}"
-        path = company_dir / filename
-
-        entry = {
-            "date": ann_date,
-            "title": f["title"],
-            "file": filename,
-            "link": pdf_url,
-            "fileType": f.get("adjunctType", "PDF"),
-            "fileSize": f.get("adjunctSize", 0),
-            "secCode": sec_code,
-            "secName": f.get("secName", ""),
-        }
-
-        try:
-            if path.exists() and not force:
-                log.info("[SKIP] 已存在: %s", path)
-                skip += 1
-            else:
-                action = "覆盖下载" if force and path.exists() else "下载"
-                log.info("%s第 %d/%d 个: %s", action, i, len(filings), f["title"])
-                company_dir.mkdir(parents=True, exist_ok=True)
-
-                resp = sess.get(
-                    pdf_url,
-                    headers={
-                        "User-Agent": DEFAULT_HEADERS["User-Agent"],
-                        "Referer": "https://www.cninfo.com.cn/",
-                    },
-                    timeout=60,
-                )
-                resp.raise_for_status()
-
-                content_type = resp.headers.get("Content-Type", "")
-                if "pdf" not in content_type.lower() and not resp.content[:5].startswith(b"%PDF"):
-                    log.error("[FAIL] 不是 PDF: %s (ct=%s)", filename, content_type[:30])
-                    fail += 1
-                    continue
-
-                atomic_write(path, resp.content)
-                log.info("[OK] %s", path)
-                ok += 1
-                time.sleep(REQUEST_INTERVAL)
-
-            upsert_index(company_dir, market, sec_code, f.get("secName", ""), entry)
-        except Exception as e:
-            log.error("[FAIL] %s: %s", pdf_url, e)
-            fail += 1
-
-    # Force 模式：清理本地多余文件
     if force and filings:
-        sec_code = filings[0].get("secCode", "unknown")
-        company_dir = root / market / sec_code
-        removed = cleanup_orphans(company_dir, expected_filenames)
-        if removed:
-            log.info("已清理 %d 个多余 PDF 文件", removed)
+        company_dir = root / market / filings[0].get("secCode", "unknown")
+        expected = {_filename(f) for f in filings if f.get("pdfUrl")}
+        if removed := cleanup_orphans(company_dir, expected):
+            log.info(f"已清理 {removed} 个多余 PDF 文件")
 
-    log.info("下载完成: %d 新下载, %d 已存在跳过, %d 失败", ok, skip, fail)
+    log.info(f"下载完成: {stats['ok']} 新下载, {stats['skip']} 已存在跳过, {stats['fail']} 失败")
 
 
 def download_stock(stock_code: str, output: Path, date_from: str = "", date_to: str = "",
@@ -322,10 +233,6 @@ def download_stock(stock_code: str, output: Path, date_from: str = "", date_to: 
 
     日期参数为 YYYY-MM-DD 字符串，空串表示用内置默认（近5年起、至今）。
     """
-    filings = search_filings(
-        stock_code=stock_code,
-        date_from=parse_date(date_from),
-        date_to=parse_date(date_to),
-    )
-    log.info("共找到 %d 条年报", len(filings))
+    filings = search_filings(stock_code, parse_date(date_from), parse_date(date_to))
+    log.info(f"共找到 {len(filings)} 条年报")
     download_filings(filings, output, "cn", force=force)

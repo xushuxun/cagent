@@ -69,6 +69,9 @@ def ocr_pdf_in_lakehouse() -> None:
     for pdf_path in need_to_parse_pdfs:
         log.info(f"解析 PDF: {pdf_path}")
         md_content = pdf_to_md(pdf_path)
+        md_path = md_dir / (pdf_path.stem + ".md")
+        md_path.write_text(md_content, encoding="utf-8")
+        log.info(f"输出 Markdown: {md_path}")
 
 
 if __name__ == "__main__":

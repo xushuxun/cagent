@@ -5,7 +5,7 @@ import httpx2
 
 BASE_URL = "http://localhost:8000"
 MODEL = "OvisOCR2"
-TIMEOUT = 60
+TIMEOUT = 300
 MAX_TOKENS =8192 
 PAGE_CONCURRENCY = 16
 
@@ -42,14 +42,17 @@ async def request_llm(client: httpx2.AsyncClient, img_base64: str, temperature: 
         "temperature": temperature,
         "stream": False,
     }
-    response = await client.post("/v1/chat/completions", json=payload)
-    response.raise_for_status()
-    choice = response.json()["choices"][0]
-    finish_reason = choice.get("finish_reason", "")
-    if finish_reason == "length":
-        return "<!-- reach max_tokens -->"
+    try:
+        response = await client.post("/v1/chat/completions", json=payload)
+        response.raise_for_status()
+        choice = response.json()["choices"][0]
+        finish_reason = choice.get("finish_reason", "")
+        if finish_reason == "length":
+            return "<!-- error: max_tokens -->"
 
-    return choice["message"]["content"]
+        return choice["message"]["content"]
+    except Exception as exc:
+        return f"<!-- error: {type(exc).__name__}: {exc} -->"
 
 async def _request_llm_bounded(semaphore: asyncio.Semaphore, client: httpx2.AsyncClient, img_base64: str) -> str:
     async with semaphore:
