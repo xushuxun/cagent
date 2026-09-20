@@ -7,18 +7,21 @@ from cagent.doc import AnnualReport, Section
 
 system_prompt = {
     "role": "system",
-    "content": "你是一个价值投资助手, 回答问题时要求言简意赅，面向投资者，符合价值巴菲特芒格的投资理念",
+    "content": "你是一个价值投资者, 你正在阅读一篇上市公司年报，回答问题要符合价值巴菲特芒格的投资理念",
 }
 
 
 def is_section_relevant(agent: Agent, question: str, section: Section) -> bool:
     relevance_prompt = textwrap.dedent(f"""
-        问题：{question}
+        <question>
+        {question}
+        </question>
 
-        根据年报标题列表，猜测其中某些章节内容是否可能与问题相关
+        根据以下年报标题列表，判断其中的内容是否有助于回答问题：
 
-        以下是年报中的部分章节标题：
+        <section-titles>
         {"\n".join(f"- {t}" for t in section.titles)}
+        </section-titles>
 
     """).strip()
     relevance_format = {
@@ -41,44 +44,25 @@ def is_section_relevant(agent: Agent, question: str, section: Section) -> bool:
     return relevance["relevant"]
 
 
-def answer(agent: Agent, question: str, section: Section) -> str | None:
+def answer_with_section(agent: Agent, question: str, section: Section) -> str | None:
     prompt = textwrap.dedent(f"""
-        问题：{question}
+        <question>
+        {question}
+        </question>
 
-        要求：
-        1. 只使用章节内容中的事实，不要推测
-        2. 以 JSON 格式输出回答，包含两个字段：
-           - answer: 回答内容，若章节内容不足以回答问题，则为空字符串
-           - sufficient: 布尔值，表示章节内容是否足以有意义回答问题
+        <requirements>
+        只使用章节内容中的事实，不要推测，无法回答问题时留空
+        </requirements>
 
         以下是年报章节内容：
+        <section-content>
         {section.text}
+        </section-content>
 
     """).strip()
-    answer_format = {
-        "type": "json_schema",
-        "json_schema": {
-            "name": "answer",
-            "schema": {
-                "type": "object",
-                "properties": {
-                    "answer": {"type": "string"},
-                    "sufficient": {"type": "boolean"},
-                },
-                "required": ["answer", "sufficient"],
-            },
-        },
-    }
-    response = json.loads(
-        agent.chat(
-            messages=[system_prompt, {"role": "user", "content": prompt}],
-            response_format=answer_format,
-        )
-    )
-    answer_text = response["answer"].strip()
-    if not response.get("sufficient") or not answer_text:
-        return None
-    return answer_text
+    return agent.chat(messages=[system_prompt, {"role": "user", "content": prompt}])
+
+
 
 
 def merge_answer(agent: Agent, question: str, answers: list[str]) -> str:
@@ -88,13 +72,21 @@ def merge_answer(agent: Agent, question: str, answers: list[str]) -> str:
         return answers[0]
 
     prompt = textwrap.dedent(f"""
-        问题：{question}
+        <question>
+        {question}
+        </question>
 
+        <requirements>
         现有 {len(answers)} 个回答，请将它们合并为一个完整的回答，要求：
         1. 去掉与问题无关、不重要、参考意义不大的内容。
         2. 如果回答中有矛盾或者重复，删掉，只保留精简自恰的内容。
+        </requirements>
+
         各个回答如下：
-        {"\n\n".join(f"回答 {i + 1}:\n{a}" for i, a in enumerate(answers))}
+        <answers>
+        {"\n\n".join(f'<answer id="{i + 1}">\n{a}\n</answer>' for i, a in enumerate(answers))}
+        </answers>
+
         请输出合并后的完整回答。
     """).strip()
     return agent.chat(messages=[system_prompt, {"role": "user", "content": prompt}]).strip()
@@ -116,8 +108,8 @@ if __name__ == "__main__":
     agent = Agent(trace=True)
 
     questions = [
-        # "生意模式",
-        "管理层认知、判断与决策",
+        "本公司的生意模式，谁在付钱、为什么付钱、不付的代价是什么、靠什么持续赚钱？",
+        "管理层对宏观环境、行业趋势、公司经营的认知与判断，以及相关决策",
     ]
 
     report = AnnualReport(Path(__file__).parent / "test_annual.md")
@@ -130,15 +122,13 @@ if __name__ == "__main__":
         for i, section in enumerate(sections, 1):
             prefix = f"{DIM}[{i:>3}/{len(sections)}]{RESET}"
 
-            # is_relevant = is_section_relevant(agent, question, section)
-            # if not is_relevant:
-            #     print(f"{prefix} {DIM}✗ 标题跳过  {short_title(section.titles)}{RESET}")
-            #     continue
+            is_relevant = is_section_relevant(agent, question, section)
+            if not is_relevant:
+                print(f"{prefix} {DIM}✗ 标题跳过  {short_title(section.titles)}{RESET}")
+                continue
 
-            section_answer = answer(agent=agent, question=question, section=section)
-            if section_answer is None:
-                print(f"{prefix} {DIM}✗ 内容跳过  {short_title(section.titles)}{RESET}")
-            else:
+            section_answer = answer_with_section(agent=agent, question=question, section=section)
+            if section_answer is not None:
                 answers.append(section_answer)
                 print(f"{prefix} {GREEN}✓ 采用  {short_title(section.titles)}{RESET}")
 
