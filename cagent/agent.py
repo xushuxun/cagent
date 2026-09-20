@@ -5,7 +5,12 @@ import requests
 
 
 class Agent:
-    def __init__(self, base_url: str = "http://localhost:9931/v1", model: str = "", trace: bool = False):
+    def __init__(
+        self,
+        base_url: str = "http://localhost:9931/v1",
+        model: str = "",
+        trace: bool = False,
+    ):
         self.base_url = base_url
         self.model = model
         self.trace = trace
@@ -32,7 +37,7 @@ class Agent:
         response.raise_for_status()
         content = response.json()["choices"][0]["message"]["content"]
         if self.trace:
-            with open(f"{self.agent_id}.jsonl", "a", encoding="utf-8") as f:
+            with open(f"output/{self.agent_id}.jsonl", "a", encoding="utf-8") as f:
                 record = {"request": data, "response": content}
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
         return content

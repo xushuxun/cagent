@@ -1,4 +1,3 @@
-
 import asyncio
 
 import httpx2
@@ -6,7 +5,7 @@ import httpx2
 BASE_URL = "http://localhost:8000"
 MODEL = "OvisOCR2"
 TIMEOUT = 300
-MAX_TOKENS =8192 
+MAX_TOKENS = 8192
 PAGE_CONCURRENCY = 16
 
 OCR_PROMPT = (
@@ -26,6 +25,7 @@ def connect_llm(base_url: str = BASE_URL) -> httpx2.AsyncClient:
     response.raise_for_status()
     return httpx2.AsyncClient(base_url=base_url, trust_env=False, verify=False, timeout=TIMEOUT)
 
+
 async def request_llm(client: httpx2.AsyncClient, img_base64: str, temperature: float = 0.0) -> str:
     payload = {
         "model": MODEL,
@@ -33,7 +33,10 @@ async def request_llm(client: httpx2.AsyncClient, img_base64: str, temperature: 
             {
                 "role": "user",
                 "content": [
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_base64}"}},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{img_base64}"},
+                    },
                     {"type": "text", "text": OCR_PROMPT},
                 ],
             }
@@ -54,12 +57,15 @@ async def request_llm(client: httpx2.AsyncClient, img_base64: str, temperature: 
     except Exception as exc:
         return f"<!-- error: {type(exc).__name__}: {exc} -->"
 
+
 async def _request_llm_bounded(semaphore: asyncio.Semaphore, client: httpx2.AsyncClient, img_base64: str) -> str:
     async with semaphore:
         return await request_llm(client, img_base64)
 
+
 def request_llm_batch(client: httpx2.AsyncClient, images_base64: list) -> list[str]:
     """批量请求 LLM，返回结果列表，并发上限为 PAGE_CONCURRENCY。"""
+
     async def _run() -> list[str]:
         semaphore = asyncio.Semaphore(PAGE_CONCURRENCY)
         tasks = [_request_llm_bounded(semaphore, client, img_base64) for img_base64 in images_base64]

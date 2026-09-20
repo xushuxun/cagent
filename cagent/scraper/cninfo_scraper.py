@@ -66,13 +66,16 @@ def _stock_list() -> dict[str, dict]:
         log.info(f"已从本地 {LOCAL_STOCK_LIST.name} 加载 {len(stocks)} 只A股")
         return stocks
     log.info("加载A股股票列表...")
-    resp = requests.get(CNINFO_STOCK_URL, timeout=30, headers={
-        "User-Agent": DEFAULT_HEADERS["User-Agent"],
-        "Referer": "https://www.cninfo.com.cn/",
-    })
+    resp = requests.get(
+        CNINFO_STOCK_URL,
+        timeout=30,
+        headers={
+            "User-Agent": DEFAULT_HEADERS["User-Agent"],
+            "Referer": "https://www.cninfo.com.cn/",
+        },
+    )
     resp.raise_for_status()
-    return {s["code"].strip(): {"orgId": s.get("orgId", ""), "name": s.get("zwjc", "")}
-            for s in resp.json().get("stockList", []) if s.get("code", "").strip()}
+    return {s["code"].strip(): {"orgId": s.get("orgId", ""), "name": s.get("zwjc", "")} for s in resp.json().get("stockList", []) if s.get("code", "").strip()}
 
 
 def _build_stock_param(code: str) -> str:
@@ -138,17 +141,14 @@ def fetch_annual_reports(stock: str, date_from: str, date_to: str) -> list[dict]
     return [_parse_announcement(a) for a in announcements]
 
 
-def search_filings(stock_code: str, date_from: datetime | None = None,
-                   date_to: datetime | None = None) -> list[dict]:
+def search_filings(stock_code: str, date_from: datetime | None = None, date_to: datetime | None = None) -> list[dict]:
     """搜索年报元数据（服务端按年报分类过滤，再按标题排除摘要/英文版）。"""
     today = datetime.now()
     date_from, date_to = date_from or today - timedelta(days=5 * 365), date_to or today
     log.info(f"开始搜索: 股票={stock_code}, 区间 {date_from:%Y-%m-%d} ~ {date_to:%Y-%m-%d}")
 
-    announcements = fetch_annual_reports(stock_code, date_from.strftime("%Y-%m-%d"),
-                                         date_to.strftime("%Y-%m-%d"))
-    kept = [r for r in announcements
-            if r["adjunctType"].upper() == "PDF" and is_annual_report(r["title"])]
+    announcements = fetch_annual_reports(stock_code, date_from.strftime("%Y-%m-%d"), date_to.strftime("%Y-%m-%d"))
+    kept = [r for r in announcements if r["adjunctType"].upper() == "PDF" and is_annual_report(r["title"])]
     log.info(f"搜索完成：命中 {len(announcements)} 条，滤除非 PDF 与摘要/英文版后保留 {len(kept)} 条")
     return kept
 
@@ -159,8 +159,15 @@ def _filename(f: dict) -> str:
     return f"{f.get('announcementDate', 'nodate')}_{orig}"
 
 
-def _download_one(sess: requests.Session, f: dict, root: Path, market: str,
-                  force: bool, i: int, total: int) -> str:
+def _download_one(
+    sess: requests.Session,
+    f: dict,
+    root: Path,
+    market: str,
+    force: bool,
+    i: int,
+    total: int,
+) -> str:
     """下载单条公告 PDF 并补登 index 条目，返回 ok/skip/fail。"""
     if not f.get("pdfUrl"):
         log.warning(f"[SKIP] 无链接: {f.get('title', '')}")
@@ -185,10 +192,14 @@ def _download_one(sess: requests.Session, f: dict, root: Path, market: str,
         else:
             log.info(f"{'覆盖下载' if force and path.exists() else '下载'}第 {i}/{total} 个: {f['title']}")
             company_dir.mkdir(parents=True, exist_ok=True)
-            resp = sess.get(f["pdfUrl"], timeout=60, headers={
-                "User-Agent": DEFAULT_HEADERS["User-Agent"],
-                "Referer": "https://www.cninfo.com.cn/",
-            })
+            resp = sess.get(
+                f["pdfUrl"],
+                timeout=60,
+                headers={
+                    "User-Agent": DEFAULT_HEADERS["User-Agent"],
+                    "Referer": "https://www.cninfo.com.cn/",
+                },
+            )
             resp.raise_for_status()
             content_type = resp.headers.get("Content-Type", "")
             if "pdf" not in content_type.lower() and not resp.content[:5].startswith(b"%PDF"):
@@ -215,8 +226,7 @@ def download_filings(filings: list[dict], root: Path, market: str, force: bool =
     --force 模式：覆盖已有 PDF 并清理本地多余文件，使本地目录与搜索结果精确同步。
     """
     sess = requests.Session()
-    stats = Counter(_download_one(sess, f, root, market, force, i, len(filings))
-                    for i, f in enumerate(filings, 1))
+    stats = Counter(_download_one(sess, f, root, market, force, i, len(filings)) for i, f in enumerate(filings, 1))
 
     if force and filings:
         company_dir = root / market / filings[0].get("secCode", "unknown")
@@ -227,8 +237,13 @@ def download_filings(filings: list[dict], root: Path, market: str, force: bool =
     log.info(f"下载完成: {stats['ok']} 新下载, {stats['skip']} 已存在跳过, {stats['fail']} 失败")
 
 
-def download_stock(stock_code: str, output: Path, date_from: str = "", date_to: str = "",
-                   force: bool = False) -> None:
+def download_stock(
+    stock_code: str,
+    output: Path,
+    date_from: str = "",
+    date_to: str = "",
+    force: bool = False,
+) -> None:
     """搜索并下载单只股票的年报到 lakehouse（函数调用入口，供批量脚本使用）。
 
     日期参数为 YYYY-MM-DD 字符串，空串表示用内置默认（近5年起、至今）。

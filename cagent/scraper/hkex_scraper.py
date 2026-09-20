@@ -71,9 +71,7 @@ def parse_record(rec: dict) -> dict:
     return {
         "stockCode": rec.get("STOCK_CODE", "").split("<br/>")[0].strip(),
         "stockName": clean(rec.get("STOCK_NAME", "").split("<br/>")[0]),
-        "title": clean(rec.get("TITLE", "")
-                       .replace("&#x3b;", ";").replace("&amp;", "&")
-                       .replace("&#x2f;", "/").replace("&#x2F;", "/")),
+        "title": clean(rec.get("TITLE", "").replace("&#x3b;", ";").replace("&amp;", "&").replace("&#x2f;", "/").replace("&#x2F;", "/")),
         "date": rec.get("DATE_TIME", "").split(" ")[0],
         "link": BASE + link if link.startswith("/") else link,
         "fileType": (rec.get("FILE_TYPE", "") or "").upper(),
@@ -86,27 +84,53 @@ def resolve_stock_id(sess: requests.Session, code: str) -> str:
 
     响应是 JSONP（callback(...)）包装，这里剥掉外壳取 JSON；接口改版会直接 ValueError。
     """
-    resp = sess.get(f"{BASE}/search/prefix.do", params={
-        "callback": "callback", "lang": "ZH", "type": "A", "name": code, "market": "SEHK",
-    }, headers={"Referer": SEARCH}, timeout=30)
+    resp = sess.get(
+        f"{BASE}/search/prefix.do",
+        params={
+            "callback": "callback",
+            "lang": "ZH",
+            "type": "A",
+            "name": code,
+            "market": "SEHK",
+        },
+        headers={"Referer": SEARCH},
+        timeout=30,
+    )
     resp.raise_for_status()
     text = resp.text
-    info = json.loads(text[text.index("(") + 1:text.rindex(")")]).get("stockInfo") or []
+    info = json.loads(text[text.index("(") + 1 : text.rindex(")")]).get("stockInfo") or []
     target = norm_stock(code)
-    return next((str(item.get("stockId", "")) for item in info
-                 if norm_stock(str(item.get("code", ""))) == target), "")
+    return next(
+        (str(item.get("stockId", "")) for item in info if norm_stock(str(item.get("code", ""))) == target),
+        "",
+    )
 
 
 def _fetch_rows(sess: requests.Session, frm: str, to: str, stock_id: str, row_range: int) -> dict:
-    resp = sess.get(API, params={
-        "sortDir": "0", "sortByOptions": "DateTime", "category": "0", "market": "SEHK",
-        "stockId": stock_id, "documentType": "-1", "fromDate": frm, "toDate": to,
-        "title": "", "searchType": "1",
-        # 服务端分类过滤：t1code=40000（財務報表/ESG 類），t2code=40100（年報）
-        # 服务端不过滤：t1code=-2，t2code=-2
-        "t1code": "40000", "t2Gcode": "-2", "t2code": "40100",
-        "rowRange": str(row_range), "lang": "ZH",
-    }, headers={"Referer": SEARCH, "X-Requested-With": "XMLHttpRequest"}, timeout=120)
+    resp = sess.get(
+        API,
+        params={
+            "sortDir": "0",
+            "sortByOptions": "DateTime",
+            "category": "0",
+            "market": "SEHK",
+            "stockId": stock_id,
+            "documentType": "-1",
+            "fromDate": frm,
+            "toDate": to,
+            "title": "",
+            "searchType": "1",
+            # 服务端分类过滤：t1code=40000（財務報表/ESG 類），t2code=40100（年報）
+            # 服务端不过滤：t1code=-2，t2code=-2
+            "t1code": "40000",
+            "t2Gcode": "-2",
+            "t2code": "40100",
+            "rowRange": str(row_range),
+            "lang": "ZH",
+        },
+        headers={"Referer": SEARCH, "X-Requested-With": "XMLHttpRequest"},
+        timeout=120,
+    )
     resp.raise_for_status()
     return resp.json()
 
@@ -137,8 +161,7 @@ def fetch_filings(sess: requests.Session, frm: str, to: str, stock_id: str) -> l
     return out
 
 
-def search_filings(stock_code: str, date_from: datetime | None = None,
-                   date_to: datetime | None = None) -> list[dict]:
+def search_filings(stock_code: str, date_from: datetime | None = None, date_to: datetime | None = None) -> list[dict]:
     """搜索年报元数据（stockId + 年报分类代码均由服务端过滤）。"""
     today = datetime.now()
     date_from, date_to = date_from or today - timedelta(days=5 * 365), date_to or today
@@ -167,8 +190,15 @@ def _filename(f: dict) -> str:
     return f"{iso_date(f['date'])}_{orig}"
 
 
-def _download_one(sess: requests.Session, f: dict, root: Path, market: str,
-                  force: bool, i: int, total: int) -> str:
+def _download_one(
+    sess: requests.Session,
+    f: dict,
+    root: Path,
+    market: str,
+    force: bool,
+    i: int,
+    total: int,
+) -> str:
     """下载单条公告 PDF 并补登 index 条目，返回 ok/skip/fail。"""
     if not f.get("link"):
         log.warning(f"[SKIP] 无链接: {f.get('title', '')}")
@@ -213,8 +243,7 @@ def download_filings(filings: list[dict], root: Path, market: str, force: bool =
     --force 模式：覆盖已有 PDF 并清理本地多余文件，使本地目录与搜索结果精确同步。
     """
     sess = requests.Session()
-    stats = Counter(_download_one(sess, f, root, market, force, i, len(filings))
-                    for i, f in enumerate(filings, 1))
+    stats = Counter(_download_one(sess, f, root, market, force, i, len(filings)) for i, f in enumerate(filings, 1))
 
     if force and filings:
         company_dir = root / market / norm_stock(filings[0]["stockCode"])
@@ -225,8 +254,13 @@ def download_filings(filings: list[dict], root: Path, market: str, force: bool =
     log.info(f"下载完成: {stats['ok']} 新下载, {stats['skip']} 已存在跳过, {stats['fail']} 失败")
 
 
-def download_stock(stock_code: str, output: Path, date_from: str = "", date_to: str = "",
-                   force: bool = False) -> None:
+def download_stock(
+    stock_code: str,
+    output: Path,
+    date_from: str = "",
+    date_to: str = "",
+    force: bool = False,
+) -> None:
     """搜索并下载单只股票的年报到 lakehouse（函数调用入口，供批量脚本使用）。
 
     日期参数为 YYYY-MM-DD 字符串，空串表示用内置默认（近5年起、至今）。

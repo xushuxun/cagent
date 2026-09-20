@@ -18,7 +18,34 @@ def run_code(code: str, namespace: dict) -> str:
             return allowed[name]
         raise ImportError(f"import {name} 不被允许")
 
-    env = {"re": re, "json": json, "math": math, "__builtins__": {"__import__": safe_import, "len": len, "range": range, "enumerate": enumerate, "float": float, "int": int, "str": str, "print": print, "sorted": sorted, "dict": dict, "list": list, "tuple": tuple, "set": set, "isinstance": isinstance, "abs": abs, "round": round, "min": min, "max": max, "sum": sum, "ValueError": ValueError, "Exception": Exception}}
+    env = {
+        "re": re,
+        "json": json,
+        "math": math,
+        "__builtins__": {
+            "__import__": safe_import,
+            "len": len,
+            "range": range,
+            "enumerate": enumerate,
+            "float": float,
+            "int": int,
+            "str": str,
+            "print": print,
+            "sorted": sorted,
+            "dict": dict,
+            "list": list,
+            "tuple": tuple,
+            "set": set,
+            "isinstance": isinstance,
+            "abs": abs,
+            "round": round,
+            "min": min,
+            "max": max,
+            "sum": sum,
+            "ValueError": ValueError,
+            "Exception": Exception,
+        },
+    }
     env.update(namespace)
     buffer = io.StringIO()
     with redirect_stdout(buffer):
@@ -52,7 +79,12 @@ def gen_extract_code(agent: Agent, sample_text: str, max_attempts: int = 3) -> s
             assert all(isinstance(k, str) and isinstance(v, (int, float)) for k, v in data.items()), "提取结果必须是 科目名->数值 的 JSON"
             return code
         except Exception as e:
-            messages.append({"role": "user", "content": f"代码执行报错：{e!r}。请修正代码后重新输出完整代码，仍然只输出代码本身。"})
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"代码执行报错：{e!r}。请修正代码后重新输出完整代码，仍然只输出代码本身。",
+                }
+            )
     raise RuntimeError(f"提取代码 {max_attempts} 次尝试均失败")
 
 
@@ -109,10 +141,12 @@ def plan_checks(agent: Agent, data: dict[str, float]) -> list[dict]:
             },
         },
     }
-    planned = json.loads(agent.chat(
-        [{"role": "user", "content": prompt}],
-        response_format=check_format,
-    ))
+    planned = json.loads(
+        agent.chat(
+            [{"role": "user", "content": prompt}],
+            response_format=check_format,
+        )
+    )
     return planned["checks"]
 
 
@@ -123,17 +157,19 @@ def run_checks(data: dict[str, float], checks: list[dict]) -> list[dict]:
         try:
             lhs = eval(check["lhs"], {"__builtins__": {}}, dict(data))
             rhs = eval(check["rhs"], {"__builtins__": {}}, dict(data))
-        except (NameError, KeyError, TypeError, ZeroDivisionError):
+        except NameError, KeyError, TypeError, ZeroDivisionError:
             continue
         diff = lhs - rhs
-        results.append({
-            "description": check["description"],
-            "lhs": check["lhs"],
-            "rhs": check["rhs"],
-            "lhs_value": lhs,
-            "rhs_value": rhs,
-            "passed": abs(diff) <= check["tolerance"],
-        })
+        results.append(
+            {
+                "description": check["description"],
+                "lhs": check["lhs"],
+                "rhs": check["rhs"],
+                "lhs_value": lhs,
+                "rhs_value": rhs,
+                "passed": abs(diff) <= check["tolerance"],
+            }
+        )
     return results
 
 
@@ -159,7 +195,14 @@ def analyze(agent: Agent, question: str, data: dict[str, float], check_results: 
 
 
 if __name__ == "__main__":
-    DIM, GREEN, YELLOW, CYAN, RED, RESET = "\033[2m", "\033[32m", "\033[33m", "\033[36m", "\033[31m", "\033[0m"
+    DIM, GREEN, YELLOW, CYAN, RED, RESET = (
+        "\033[2m",
+        "\033[32m",
+        "\033[33m",
+        "\033[36m",
+        "\033[31m",
+        "\033[0m",
+    )
 
     agent = Agent(trace=True)
 
@@ -186,10 +229,12 @@ if __name__ == "__main__":
             },
         },
     }
-    selected = json.loads(agent.chat(
-        [{"role": "user", "content": select_prompt}],
-        response_format=select_format,
-    ))["indices"]
+    selected = json.loads(
+        agent.chat(
+            [{"role": "user", "content": select_prompt}],
+            response_format=select_format,
+        )
+    )["indices"]
     fin_sections = [sections[i] for i in selected]
     print(f"{DIM}AI 选中了 {len(fin_sections)}/{len(sections)} 个章节：{selected}{RESET}")
 

@@ -11,14 +11,13 @@
 """
 
 import argparse
+import base64
 import logging
 import sys
 from pathlib import Path
-import base64
 
-from cagent.ocr.pdf_utils import render_pdf_to_images
 from cagent.ocr.llm_utils import connect_llm, request_llm_batch
-
+from cagent.ocr.pdf_utils import render_pdf_to_images
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,16 +31,15 @@ log = logging.getLogger("ocr")
 
 def pdf_to_md(pdf_path: Path) -> str:
     client = connect_llm()
-        
+
     images = render_pdf_to_images(pdf_path)
     images_base64 = [base64.b64encode(image).decode("utf-8") for image in images]
 
     md_pages = request_llm_batch(client, images_base64)
 
-    md_content = "\n".join(
-        f"<!-- page {i + 1} -->\n{md_page}" for i, md_page in enumerate(md_pages)
-    )
+    md_content = "\n".join(f"<!-- page {i + 1} -->\n{md_page}" for i, md_page in enumerate(md_pages))
     return md_content
+
 
 def ocr_pdf_in_lakehouse() -> None:
     pdfs_dir = Path(args.root) / str(args.market) / str(args.stock)
@@ -49,7 +47,7 @@ def ocr_pdf_in_lakehouse() -> None:
     pdfs = list(pdfs_dir.glob("*.pdf", case_sensitive=False))
     if not pdfs_dir.exists() or not pdfs:
         log.error(f"{pdfs_dir} 不存在，请先下载年报 PDF")
-        exit(1)
+        sys.exit(1)
 
     md_dir = pdfs_dir / "derived"
     md_dir.mkdir(parents=True, exist_ok=True)
@@ -62,7 +60,7 @@ def ocr_pdf_in_lakehouse() -> None:
     need_to_parse_pdfs = [pdf for pdf, md in zip(pdfs, mds) if not md.exists()]
     if not need_to_parse_pdfs:
         log.info("已解析全部 PDF")
-        exit(0)
+        sys.exit(0)
 
     log.info(f"待解析 PDF 数量: {len(need_to_parse_pdfs)}")
 
@@ -87,7 +85,7 @@ if __name__ == "__main__":
         pdf_path = Path(args.input)
         if not pdf_path.exists():
             log.error(f"{pdf_path} 不存在")
-            exit(1)
+            sys.exit(1)
         log.info(f"单文件调试模式，解析 PDF: {pdf_path}")
         md_content = pdf_to_md(pdf_path)
         output_path = pdf_path.with_suffix(".md")
@@ -95,4 +93,3 @@ if __name__ == "__main__":
         log.info(f"输出 Markdown: {output_path}")
     else:
         ocr_pdf_in_lakehouse()
-

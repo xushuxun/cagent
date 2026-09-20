@@ -25,7 +25,7 @@ def _content_rotation(page: pdfium.PdfPage) -> int | None:
 
 def render_pdf_to_images(pdf_path: Path) -> list[bytes]:
     pdf = pdfium.PdfDocument(pdf_path)
-    
+
     images = []
     for i in range(len(pdf)):
         page = pdf[i]
@@ -33,11 +33,10 @@ def render_pdf_to_images(pdf_path: Path) -> list[bytes]:
         # PDF文档内部使用“点”（point）作为坐标和尺寸的默认单位。
         # 在标准PDF规范中，1个点严格等于 1/72 英寸，这意味着PDF的默认逻辑分辨率是 72 DPI (Dots Per Inch)。
         # 因此，scale=1.0 就代表渲染时保持1点映射为1像素，即输出图像的分辨率为72 DPI。
-        pil_image = page.render(scale=2, rotation=angle).to_pil() 
+        pil_image = page.render(scale=2, rotation=angle).to_pil()
         buf = io.BytesIO()
         pil_image.save(buf, format="PNG")
         png = buf.getvalue()
         images.append(png)
 
     return images
-        

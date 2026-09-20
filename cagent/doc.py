@@ -14,9 +14,11 @@ def estimate_tokens(text: str) -> int:
     other = len(text) - cjk
     return cjk + (other + 3) // 4
 
+
 @dataclass
 class Section:
     """一段 markdown 文本，带起始页码。"""
+
     titles: list[str]
     text: str
     page_range: tuple[int, int]  # 起始页码，闭区间
@@ -37,10 +39,23 @@ class AnnualReport:
         """按标题切分"""
         matches = list(HEADING_RE.finditer(self.text))
         spans = [(0, matches[0].start())] if matches and matches[0].start() > 0 else []
-        spans += [(m.start(), matches[i + 1].start() if i + 1 < len(matches) else len(self.text))
-                  for i, m in enumerate(matches)]
-                  
-        return [Section([m.group(2) for m in matches if m.start() == a], self.text[a:b].strip(), (self._page_at(a), self._page_at(b))) for a, b in spans if self.text[a:b].strip()]
+        spans += [
+            (
+                m.start(),
+                matches[i + 1].start() if i + 1 < len(matches) else len(self.text),
+            )
+            for i, m in enumerate(matches)
+        ]
+
+        return [
+            Section(
+                [m.group(2) for m in matches if m.start() == a],
+                self.text[a:b].strip(),
+                (self._page_at(a), self._page_at(b)),
+            )
+            for a, b in spans
+            if self.text[a:b].strip()
+        ]
 
     def section_chunks_aggregate_max_token(self, max_tokens: int = 10000) -> list[Section]:
         """按标题切分后，合并相邻段落，直到 token 数超过 max_tokens。"""
@@ -55,7 +70,13 @@ class AnnualReport:
         for chunk in chunks[1:]:
             new_text = current_text + "\n\n" + chunk.text
             if estimate_tokens(new_text) > max_tokens:
-                result.append(Section(current_titles, current_text, (current_page_start, current_page_end)))
+                result.append(
+                    Section(
+                        current_titles,
+                        current_text,
+                        (current_page_start, current_page_end),
+                    )
+                )
                 current_titles = chunk.titles
                 current_text = chunk.text
                 current_page_start = chunk.page_range[0]
@@ -66,7 +87,6 @@ class AnnualReport:
                 current_page_end = chunk.page_range[1]
         result.append(Section(current_titles, current_text, (current_page_start, current_page_end)))
         return result
-
 
 
 if __name__ == "__main__":

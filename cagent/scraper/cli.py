@@ -57,8 +57,7 @@ def group_by_market(stocks: list[dict]) -> dict[str, list[dict]]:
     bad = [s for s in stocks if s.get("market", "") not in SCRAPERS]
     if bad:
         raise ValueError(f"标的 {bad[0].get('code')} 的 market 字段无效: {bad[0].get('market')!r}（应为 cn/hk）")
-    return {m: [s for s in stocks if s["market"] == m]
-            for m in ("cn", "hk") if any(s["market"] == m for s in stocks)}
+    return {m: [s for s in stocks if s["market"] == m] for m in ("cn", "hk") if any(s["market"] == m for s in stocks)}
 
 
 def _try_download(market: str, s: dict, i: int, total: int) -> str | None:
@@ -75,13 +74,12 @@ def _try_download(market: str, s: dict, i: int, total: int) -> str | None:
 
 def download_stocks(market: str, stocks: list[dict]) -> list[str]:
     """用指定爬虫下载一个市场的一组标的年报，返回失败股票代码列表。"""
-    stocks = stocks[args.offset:args.offset + args.limit if args.limit > 0 else None]
+    stocks = stocks[args.offset : args.offset + args.limit if args.limit > 0 else None]
     if not stocks:
         log.warning(f"[{market}] 无标的可处理（offset={args.offset}, limit={args.limit}）")
         return []
     log.info(f"=== 市场 {market}: 处理 {len(stocks)} 只 ===")
-    failed = [code for i, s in enumerate(stocks, 1)
-              if (code := _try_download(market, s, i, len(stocks)))]
+    failed = [code for i, s in enumerate(stocks, 1) if (code := _try_download(market, s, i, len(stocks)))]
     log.info(f"=== 市场 {market} 完成: {len(stocks)} 只处理, {len(failed)} 只失败 ===")
     return failed
 
@@ -94,8 +92,13 @@ def run_single() -> int:
         filings = SEARCHERS[args.market](args.stock, parse_date(args.date_from), parse_date(args.date_to))
         print(json.dumps(filings, ensure_ascii=False, indent=2))
     else:
-        SCRAPERS[args.market](args.stock, Path(args.output), args.date_from, args.date_to,
-                              force=args.force)
+        SCRAPERS[args.market](
+            args.stock,
+            Path(args.output),
+            args.date_from,
+            args.date_to,
+            force=args.force,
+        )
     return 0
 
 
@@ -114,34 +117,53 @@ def run_batch() -> int:
         return 130
 
     if any(failed.values()):
-        log.warning(f"全部完成，共 {sum(map(len, failed.values()))} 只股票失败: "
-                    f"{ {m: v for m, v in failed.items() if v} }")
+        log.warning(f"全部完成，共 {sum(map(len, failed.values()))} 只股票失败: { {m: v for m, v in failed.items() if v} }")
         return 1
     log.info("全部完成，无失败")
     return 0
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="公告下载：单只检索/下载（--stock + --market）或批量下载（--list 自定义名单）")
-    parser.add_argument("--stock", default="",
-                        help="股票代码（单只模式必填），如 09863、600519")
-    parser.add_argument("--market", choices=["cn", "hk"], default="",
-                        help="单只模式必填 cn/hk；批量模式忽略")
-    parser.add_argument("--search", action="store_true",
-                        help="单只模式：只打印检索结果 JSON，不下载")
-    parser.add_argument("--list", dest="list_file", default="",
-                        help="自定义股票池 JSON（每条含 market: cn/hk，如 lakehouse/auto_stocks.json）")
-    parser.add_argument("--from", dest="date_from", default="",
-                        help="起始日期 YYYY-MM-DD（默认：各爬虫内置，近5年）")
+    parser = argparse.ArgumentParser(description="公告下载：单只检索/下载（--stock + --market）或批量下载（--list 自定义名单）")
+    parser.add_argument("--stock", default="", help="股票代码（单只模式必填），如 09863、600519")
+    parser.add_argument(
+        "--market",
+        choices=["cn", "hk"],
+        default="",
+        help="单只模式必填 cn/hk；批量模式忽略",
+    )
+    parser.add_argument("--search", action="store_true", help="单只模式：只打印检索结果 JSON，不下载")
+    parser.add_argument(
+        "--list",
+        dest="list_file",
+        default="",
+        help="自定义股票池 JSON（每条含 market: cn/hk，如 lakehouse/auto_stocks.json）",
+    )
+    parser.add_argument(
+        "--from",
+        dest="date_from",
+        default="",
+        help="起始日期 YYYY-MM-DD（默认：各爬虫内置，近5年）",
+    )
     parser.add_argument("--to", dest="date_to", default="", help="结束日期 YYYY-MM-DD（默认：今天）")
-    parser.add_argument("--output", default=str(Path(__file__).resolve().parents[2] / ".cagent"),
-                        help="lakehouse 根目录（默认 <仓库根>/.cagent）")
-    parser.add_argument("--offset", type=int, default=0, help="每个市场内从第 N 只开始（0 起），用于分片")
-    parser.add_argument("--limit", type=int, default=0,
-                        help="每个市场内最多处理 N 只，0=全部；配合 --offset 分片")
-    parser.add_argument("--force", action="store_true",
-                        help="覆盖已有 PDF 并清理多余文件（透传给爬虫）")
+    parser.add_argument(
+        "--output",
+        default=str(Path(__file__).resolve().parents[2] / ".cagent"),
+        help="lakehouse 根目录（默认 <仓库根>/.cagent）",
+    )
+    parser.add_argument(
+        "--offset",
+        type=int,
+        default=0,
+        help="每个市场内从第 N 只开始（0 起），用于分片",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=0,
+        help="每个市场内最多处理 N 只，0=全部；配合 --offset 分片",
+    )
+    parser.add_argument("--force", action="store_true", help="覆盖已有 PDF 并清理多余文件（透传给爬虫）")
     args = parser.parse_args()
 
     sys.exit(run_single() if args.stock else run_batch())

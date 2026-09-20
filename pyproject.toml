@@ -24,6 +24,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["cagent"]
 
+[tool.ruff]
+line-length = 160
+
 [tool.ruff.lint]
 ignore = [
     # 批量抓取/OCR/agent 长循环：故意 catch-all 记录后继续，不让单条失败中断整批
