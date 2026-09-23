@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>原型 C · 重放器</title>
+<style>
+  :root { --ink:#1c1b18; --mute:#8a8577; --paper:#faf8f3; --line:#e3ded2; --say:#3a5a8c; --do:#3d6b4f; }
+  * { margin:0; box-sizing:border-box; }
+  body { background:var(--paper); color:var(--ink); font-family:"Noto Serif SC","Songti SC",serif; line-height:1.8; min-height:100vh; display:flex; flex-direction:column; }
+  header { max-width:1080px; margin:0 auto; padding:48px 32px 8px; width:100%; }
+  header h1 { font-size:24px; font-weight:600; }
+  header p { color:var(--mute); font-size:13px; margin-top:4px; }
+  main { flex:1; max-width:1080px; margin:0 auto; padding:24px 32px; width:100%; display:grid; grid-template-columns:1.1fr 1fr; gap:40px; }
+  .yeardigit { font-size:72px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1; letter-spacing:.02em; }
+  .caption { color:var(--mute); font-size:13px; margin:8px 0 24px; }
+  blockquote { border-left:3px solid var(--say); padding:4px 0 4px 18px; font-size:17px; }
+  blockquote footer { margin-top:10px; font-size:12px; color:var(--mute); }
+  blockquote footer a { color:var(--say); text-decoration:none; border-bottom:1px dotted var(--say); }
+  .acts { list-style:none; padding:0; margin-top:20px; font-size:14px; }
+  .acts li { padding:5px 0 5px 18px; position:relative; }
+  .acts li::before { content:""; position:absolute; left:0; top:15px; width:7px; height:7px; border-radius:50%; background:var(--do); opacity:.55; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:right; padding:9px 10px; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; }
+  th:first-child, td:first-child { text-align:left; color:var(--mute); font-size:13px; }
+  thead th { font-size:12px; color:var(--mute); font-weight:400; }
+  tr.future { color:#c9c3b4; }
+  tr.now td { font-weight:600; }
+  .tape { max-width:1080px; margin:0 auto; width:100%; padding:8px 32px 48px; }
+  .controls { display:flex; align-items:center; gap:20px; }
+  #play { font:inherit; width:44px; height:44px; border-radius:50%; border:1px solid var(--ink); background:transparent; cursor:pointer; font-size:15px; color:var(--ink); }
+  input[type=range] { flex:1; appearance:none; height:2px; background:var(--line); outline:none; }
+  input[type=range]::-webkit-slider-thumb { appearance:none; width:16px; height:16px; border-radius:50%; background:var(--ink); cursor:pointer; }
+  .ticks { display:flex; justify-content:space-between; font-size:12px; color:var(--mute); margin-top:8px; font-variant-numeric:tabular-nums; }
+  footer.site { max-width:1080px; margin:0 auto; width:100%; padding:16px 32px 40px; color:var(--mute); font-size:12px; border-top:1px solid var(--line); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>长城汽车 <span style="color:var(--mute);font-size:15px">经营历史重放</span></h1>
+  <p>原型 C：重放器 —— 拖动或播放，历史按年展开</p>
+</header>
+
+<main>
+  <section>
+    <div class="yeardigit" id="yr">2021</div>
+    <div class="caption">说 · 这一年管理层说的话</div>
+    <blockquote id="say"></blockquote>
+    <div class="caption" style="margin-top:28px">做 · 这一年的行动</div>
+    <ul class="acts" id="acts"></ul>
+  </section>
+  <section>
+    <div class="caption">&nbsp;</div>
+    <table id="nums">
+      <thead><tr><th>单位：亿元</th><th>营业收入</th><th>归母净利</th><th>扣非净利</th><th>经营现金流</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="caption" style="margin-top:10px">数字逐年落定，未到年份留白</div>
+  </section>
+</main>
+
+<div class="tape">
+  <div class="controls">
+    <button id="play">▶</button>
+    <input type="range" id="scrub" min="0" max="4" step="1" value="0">
+  </div>
+  <div class="ticks" id="ticks"></div>
+</div>
+
+<footer class="site">
+  原话逐字引用、可回溯 · 数字经程序核验 · 无总结、无点评 · 2025 年内容取自真实年报，早年原话为示意
+</footer>
+
+<script>
+const data = [
+  { y: 2021, say: "加速向全球化智能科技公司转型，以用户为中心，重构组织与产品。",
+    src: "2021 年年报 · 董事长致辞（示意）",
+    acts: ["发布 2025 战略：2025 年年销 400 万辆、新能源占比 80%", "研发投入 44.90 亿元"],
+    nums: ["1,364.05", "67.26", "42.03", "353.16"] },
+  { y: 2022, say: "以新能源、智能化为核心方向，全面重构产品矩阵。",
+    src: "2022 年年报 · 管理层讨论与分析（示意）",
+    acts: ["燃油产品线收缩，新能源切换", "研发费用 64.45 亿元，同比 +43.6%"],
+    nums: ["1,373.40", "82.66", "44.76", "123.10"] },
+  { y: 2023, say: "Hi4 智能四驱电混技术，实现四驱的性能、两驱的能耗。",
+    src: "2023 年年报 · 管理层讨论与分析（示意）",
+    acts: ["Hi4 技术发布并量产上车", "经营现金流 177.23 亿元"],
+    nums: ["1,732.00", "70.11", "48.23", "177.23"] },
+  { y: 2024, say: "从产品出海迈向生态出海，深耕海外本地化运营。",
+    src: "2024 年年报 · 董事长致辞（示意）",
+    acts: ["海外销量 45.41 万辆", "归母净利润 126.60 亿元，五年新高"],
+    nums: ["2,021.94", "126.60", "96.95", "277.71"] },
+  { y: 2025, say: "公司始终坚持研发创新、坚持长期主义、坚持高质量发展……加速构建直连用户的新渠道模式。",
+    src: "2025 年年报 · 董事长致辞 · <a href='#'>原文 ↗</a>",
+    acts: ["巴西全工艺工厂投产（2025.8）", "收购无锡芯动半导体 80% 股权", "销售费用 112.73 亿元，同比 +43.93%"],
+    nums: ["2,228.24", "98.65", "60.59", "403.55"] },
+];
+
+const scrub = document.getElementById("scrub");
+const tbody = document.querySelector("#nums tbody");
+const ticks = document.getElementById("ticks");
+
+ticks.innerHTML = data.map(d => `<span>${d.y}</span>`).join("");
+
+function render(i) {
+  const d = data[i];
+  document.getElementById("yr").textContent = d.y;
+  document.getElementById("say").innerHTML = `${d.say}<footer>${d.src}</footer>`;
+  document.getElementById("acts").innerHTML = d.acts.map(a => `<li>${a}</li>`).join("");
+  tbody.innerHTML = data.map((r, j) => {
+    const cls = j === i ? "now" : (j > i ? "future" : "");
+    const cells = j <= i ? r.nums : ["—", "—", "—", "—"];
+    return `<tr class="${cls}"><td>${r.y}</td>${cells.map(c => `<td>${c}</td>`).join("")}</tr>`;
+  }).join("");
+}
+
+let timer = null;
+const playBtn = document.getElementById("play");
+playBtn.onclick = () => {
+  if (timer) { clearInterval(timer); timer = null; playBtn.textContent = "▶"; return; }
+  playBtn.textContent = "❚❚";
+  timer = setInterval(() => {
+    let v = +scrub.value + 1;
+    if (v > 4) { clearInterval(timer); timer = null; playBtn.textContent = "▶"; return; }
+    scrub.value = v; render(v);
+  }, 1600);
+};
+scrub.oninput = () => render(+scrub.value);
+render(0);
+</script>
+
+</body>
+</html>

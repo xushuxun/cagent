@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>原型 A · 双轨时间轴</title>
+<style>
+  :root { --ink:#1c1b18; --mute:#8a8577; --paper:#faf8f3; --line:#e3ded2; --say:#3a5a8c; --do:#3d6b4f; }
+  * { margin:0; box-sizing:border-box; }
+  body { background:var(--paper); color:var(--ink); font-family:"Noto Serif SC","Songti SC",serif; line-height:1.8; }
+  header { max-width:1080px; margin:0 auto; padding:56px 32px 8px; }
+  header h1 { font-size:26px; font-weight:600; letter-spacing:.02em; }
+  header p { color:var(--mute); font-size:13px; margin-top:6px; }
+  .legend { max-width:1080px; margin:24px auto 0; padding:0 32px; display:flex; gap:32px; font-size:13px; color:var(--mute); }
+  .legend b.say { color:var(--say); font-weight:600; }
+  .legend b.do { color:var(--do); font-weight:600; }
+  .track { max-width:1080px; margin:24px auto 80px; padding:0 32px; }
+  .year { display:grid; grid-template-columns:1fr 90px 1fr; gap:24px; padding:32px 0; border-top:1px solid var(--line); }
+  .spine { text-align:center; position:relative; }
+  .spine::before { content:""; position:absolute; left:50%; top:-32px; bottom:-32px; width:1px; background:var(--line); }
+  .year:first-child .spine::before { top:0; }
+  .yr { position:sticky; top:24px; display:inline-block; background:var(--paper); border:1px solid var(--line); border-radius:999px; padding:2px 14px; font-size:14px; font-variant-numeric:tabular-nums; }
+  blockquote { border-left:3px solid var(--say); padding:4px 0 4px 16px; color:#2c2a26; font-size:15px; }
+  blockquote footer { margin-top:10px; font-size:12px; color:var(--mute); }
+  blockquote footer a { color:var(--say); text-decoration:none; border-bottom:1px dotted var(--say); }
+  .label { font-size:12px; letter-spacing:.2em; color:var(--say); margin-bottom:10px; }
+  .do-col .label { color:var(--do); }
+  .acts { list-style:none; padding:0; font-size:15px; }
+  .acts li { padding:6px 0 6px 18px; position:relative; }
+  .acts li::before { content:""; position:absolute; left:0; top:17px; width:7px; height:7px; border-radius:50%; background:var(--do); opacity:.55; }
+  .nums { margin-top:14px; display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); }
+  .nums div { background:var(--paper); padding:10px 12px; }
+  .nums dt { font-size:11px; color:var(--mute); }
+  .nums dd { font-size:16px; font-variant-numeric:tabular-nums; }
+  .nums dd small { font-size:11px; color:var(--mute); margin-left:4px; }
+  .v { color:var(--mute); font-size:11px; margin-left:6px; }
+  footer.site { max-width:1080px; margin:0 auto; padding:24px 32px 64px; color:var(--mute); font-size:12px; border-top:1px solid var(--line); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>长城汽车 <span style="color:var(--mute);font-size:15px">601633 · 经营历史重放</span></h1>
+  <p>2021—2025 · 五份年报 · 原型 A：双轨时间轴</p>
+</header>
+
+<div class="legend"><span><b class="say">左轨 · 说</b>　管理层当年原话，逐字引用</span><span><b class="do">右轨 · 做</b>　当年的行动与数字</span></div>
+
+<main class="track">
+
+  <section class="year">
+    <div>
+      <div class="label">说 · 2021</div>
+      <blockquote>
+        加速向全球化智能科技公司转型，以用户为中心，重构组织与产品。
+        <footer>2021 年年报 · 董事长致辞 <a href="#">原文 ↗</a>（示意）</footer>
+      </blockquote>
+    </div>
+    <div class="spine"><span class="yr">2021</span></div>
+    <div class="do-col">
+      <div class="label">做 · 2021</div>
+      <ul class="acts">
+        <li>发布 2025 战略，提出年销 400 万辆目标</li>
+        <li>研发投入 44.90 亿元</li>
+      </ul>
+      <dl class="nums">
+        <div><dt>营业收入</dt><dd>1,364.05<small>亿元</small></dd></div>
+        <div><dt>归母净利润</dt><dd>67.26<small>亿元</small></dd></div>
+        <div><dt>扣非净利润</dt><dd>42.03<small>亿元</small><span class="v">✓ 已核验</span></dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="year">
+    <div>
+      <div class="label">说 · 2022</div>
+      <blockquote>
+        以新能源、智能化为核心方向，全面重构产品矩阵。
+        <footer>2022 年年报 · 管理层讨论与分析 <a href="#">原文 ↗</a>（示意）</footer>
+      </blockquote>
+    </div>
+    <div class="spine"><span class="yr">2022</span></div>
+    <div class="do-col">
+      <div class="label">做 · 2022</div>
+      <ul class="acts">
+        <li>新能源车型大规模切换，燃油产品线收缩</li>
+        <li>经营现金流 123.10 亿元</li>
+      </ul>
+      <dl class="nums">
+        <div><dt>营业收入</dt><dd>1,373.40<small>亿元</small></dd></div>
+        <div><dt>归母净利润</dt><dd>82.66<small>亿元</small></dd></div>
+        <div><dt>扣非净利润</dt><dd>44.76<small>亿元</small><span class="v">✓ 已核验</span></dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="year">
+    <div>
+      <div class="label">说 · 2023</div>
+      <blockquote>
+        Hi4 智能四驱电混技术，实现四驱的性能、两驱的能耗。
+        <footer>2023 年年报 · 管理层讨论与分析 <a href="#">原文 ↗</a>（示意）</footer>
+      </blockquote>
+    </div>
+    <div class="spine"><span class="yr">2023</span></div>
+    <div class="do-col">
+      <div class="label">做 · 2023</div>
+      <ul class="acts">
+        <li>Hi4 电混技术发布并搭载哈弗枭龙系列</li>
+        <li>研发费用 80.82 亿元，同比 +25.4%</li>
+      </ul>
+      <dl class="nums">
+        <div><dt>营业收入</dt><dd>1,732.00<small>亿元</small></dd></div>
+        <div><dt>归母净利润</dt><dd>70.11<small>亿元</small></dd></div>
+        <div><dt>扣非净利润</dt><dd>48.23<small>亿元</small><span class="v">✓ 已核验</span></dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="year">
+    <div>
+      <div class="label">说 · 2024</div>
+      <blockquote>
+        从产品出海迈向生态出海，深耕海外本地化运营。
+        <footer>2024 年年报 · 董事长致辞 <a href="#">原文 ↗</a>（示意）</footer>
+      </blockquote>
+    </div>
+    <div class="spine"><span class="yr">2024</span></div>
+    <div class="do-col">
+      <div class="label">做 · 2024</div>
+      <ul class="acts">
+        <li>海外销量 45.41 万辆</li>
+        <li>归母净利润 126.60 亿元，创五年新高</li>
+      </ul>
+      <dl class="nums">
+        <div><dt>营业收入</dt><dd>2,021.94<small>亿元</small></dd></div>
+        <div><dt>归母净利润</dt><dd>126.60<small>亿元</small></dd></div>
+        <div><dt>扣非净利润</dt><dd>96.95<small>亿元</small><span class="v">✓ 已核验</span></dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="year">
+    <div>
+      <div class="label">说 · 2025</div>
+      <blockquote>
+        公司始终坚持研发创新、坚持长期主义、坚持高质量发展……加速构建直连用户的新渠道模式。
+        <footer>2025 年年报 · 董事长致辞 <a href="#">原文 ↗</a></footer>
+      </blockquote>
+    </div>
+    <div class="spine"><span class="yr">2025</span></div>
+    <div class="do-col">
+      <div class="label">做 · 2025</div>
+      <ul class="acts">
+        <li>巴西全工艺工厂投产（2025.8）</li>
+        <li>收购无锡芯动半导体 80% 股权（2025.2）</li>
+        <li>销售费用 112.73 亿元，同比 +43.93%</li>
+      </ul>
+      <dl class="nums">
+        <div><dt>营业收入</dt><dd>2,228.24<small>亿元</small></dd></div>
+        <div><dt>归母净利润</dt><dd>98.65<small>亿元</small></dd></div>
+        <div><dt>扣非净利润</dt><dd>60.59<small>亿元</small><span class="v">✓ 已核验</span></dd></div>
+      </dl>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site">
+  每句原话可回溯至年报原文 · 每个数字经过程序核验 · 本页不作任何评判 · 2025 年内容取自真实年报，早年原话为示意
+</footer>
+
+</body>
+</html>

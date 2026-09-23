@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>经营历史重放 · 前端原型</title>
+<style>
+  :root { --ink:#1c1b18; --mute:#8a8577; --paper:#faf8f3; --line:#e3ded2; }
+  * { margin:0; box-sizing:border-box; }
+  body { background:var(--paper); color:var(--ink); font-family:"Noto Serif SC","Songti SC",serif; line-height:1.8; }
+  main { max-width:860px; margin:0 auto; padding:80px 32px; }
+  h1 { font-size:28px; font-weight:600; }
+  .sub { color:var(--mute); font-size:14px; margin:10px 0 48px; }
+  a.card { display:block; border:1px solid var(--line); padding:28px 32px; margin-bottom:20px; text-decoration:none; color:inherit; transition:border-color .15s; }
+  a.card:hover { border-color:var(--ink); }
+  a.card h2 { font-size:19px; font-weight:600; }
+  a.card p { color:var(--mute); font-size:14px; margin-top:6px; }
+  footer { max-width:860px; margin:0 auto; padding:0 32px 64px; color:var(--mute); font-size:12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>企业经营历史重放 · 前端原型</h1>
+  <p class="sub">同一理念，三种形态。说与做对照陈列，全站无评判。</p>
+
+  <a class="card" href="a_timeline.html">
+    <h2>A · 双轨时间轴</h2>
+    <p>左轨是管理层当年原话，右轨是当年行动与数字，按年对齐。并置即结构，适合通读。</p>
+  </a>
+
+  <a class="card" href="b_events.html">
+    <h2>B · 决策事件流</h2>
+    <p>按决策事件分章（出海、新能源、渠道变革），事件内逐年"说 / 做"对照。因果弧线最完整，适合深读。</p>
+  </a>
+
+  <a class="card" href="c_replay.html">
+    <h2>C · 重放器</h2>
+    <p>拖动时间轴或点播放，历史一年年展开：左边定格当年原话，右边数字逐年落定。"重放"感最强，适合演示。</p>
+  </a>
+</main>
+<footer>数据说明：2025 年内容取自长城汽车真实年报；早年原话为示意，数字取自年报"近五年主要会计数据"。</footer>
+</body>
+</html>
