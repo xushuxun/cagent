@@ -5,7 +5,7 @@ import httpx2
 BASE_URL = "http://localhost:8000"
 MODEL = "OvisOCR2"
 TIMEOUT = 300
-MAX_TOKENS = 8192
+MAX_TOKENS = 16384
 PAGE_CONCURRENCY = 16
 
 OCR_PROMPT = (
