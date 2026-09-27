@@ -1,9 +1,21 @@
+"""TOC 构建 cli：
+
+    # 全量构建某公司 derived/ 下所有年报的 toc.json，已有的跳过
+    uv run cagent/chunk.py --stock 601633 --market cn
+
+    # 单文件调试
+    uv run cagent/chunk.py -i .cagent/cn/601633/derived/2026-03-28_1225047452.md
+
+幂等断点续跑：<stem>.toc.json 已存在则跳过，重跑同一命令即可续跑。
+"""
+
+import argparse
 import json
 import logging
 import re
+import sys
 import textwrap
 from pathlib import Path
-from pprint import pprint
 
 from cagent.agent import Agent
 
@@ -303,8 +315,60 @@ def align_toc(agent: Agent, pages: list[str], chapters: list[dict]) -> list[dict
     return aligned
 
 
-if __name__ == "__main__":
-    annual = (Path(__file__).parent.parent / ".cagent/hk/09863/derived/2023-04-17_2023041701384_c.md").read_text()
+def count_tokens(text: str) -> int:
+    """用本地模型的 /tokenize 端点计算 token 数。"""
+    return len(agent.tokenize(text))
+
+
+def crop_chapters(pages: list[str], aligned: list[dict]) -> list[dict]:
+    """按对齐后的 md 起始页裁剪每章 md 并计算 token 数。
+
+    每章覆盖 [md_page, 下一章 md_page - 1]，末章到文档结尾。
+    返回 [{"title", "page", "md_page", "md_end", "md", "tokens"}]。
+    """
+    cropped = []
+    for i, ch in enumerate(aligned):
+        start = ch["md_page"]
+        end = aligned[i + 1]["md_page"] - 1 if i + 1 < len(aligned) else len(pages)
+        md = "\n".join(pages[start - 1 : end])
+        cropped.append({**ch, "md_end": end, "md": md, "tokens": count_tokens(md)})
+    return cropped
+
+
+def load_toc(md_path: Path) -> list[dict]:
+    """读 md 同目录的 <stem>.toc.json，缺失时自动重建。"""
+    toc_file = md_path.with_suffix(".toc.json")
+    if not toc_file.exists():
+        build_toc(md_path)
+    return json.loads(toc_file.read_text(encoding="utf-8"))
+
+
+def load_chapters(md_path: Path) -> list[dict]:
+    """读年报并裁剪章节，返回 [{"title", "page", "md_page", "md_end", "md", "tokens"}]。"""
+    pages = split_pages(md_path.read_text(encoding="utf-8"))
+    return crop_chapters(pages, load_toc(md_path))
+
+
+class Toc:
+    """年报目录：章节列表 + 页码范围。原始 md 归调用方。"""
+
+    def __init__(self, md_path: str | Path):
+        md_path = Path(md_path)
+        self.chapters = load_toc(md_path)  # [{"title", "page", "md_page"}]
+        self.n_pages = len(split_pages(md_path.read_text(encoding="utf-8")))
+
+    def range(self, ch: dict) -> tuple[int, int]:
+        """章节的 md 页码范围 (start, end)。"""
+        i = self.chapters.index(ch)
+        start = ch["md_page"]
+        end = self.chapters[i + 1]["md_page"] - 1 if i + 1 < len(self.chapters) else self.n_pages
+        return start, end
+
+
+
+def build_toc(md_path: Path) -> None:
+    """跑 TOC 管线，把对齐结果写到 md 同目录的 <stem>.toc.json。"""
+    annual = md_path.read_text(encoding="utf-8")
     pages = split_pages(annual)
 
     toc_text = ""
@@ -317,8 +381,44 @@ if __name__ == "__main__":
             break
 
     chapters = extract_toc(agent, toc_text)
-    pprint(chapters)
-
     aligned = align_toc(agent, pages, chapters)
-    pprint(aligned)
+    cropped = crop_chapters(pages, aligned)
+
+    payload = [{k: c[k] for k in ("title", "page", "md_page")} for c in cropped]
+    out = md_path.with_suffix(".toc.json")
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+    logger.info(f"输出 TOC: {out} ({len(payload)} 章)")
+
+
+if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S",
+        stream=sys.stderr,
+    )
+
+    parser = argparse.ArgumentParser(description="构建年报章节目录 toc.json")
+    parser.add_argument("--stock", help="股票代码，如 601633、09863")
+    parser.add_argument("--market", choices=["cn", "hk"], help="目标市场")
+    parser.add_argument("--root", default=str(Path(__file__).resolve().parents[1] / ".cagent"))
+    parser.add_argument("--force", action="store_true", help="重建已存在的 toc.json")
+    parser.add_argument("-i", "--input", help="单文件调试模式，指定 md 文件路径")
+    args = parser.parse_args()
+
+    if args.input:
+        build_toc(Path(args.input))
+        sys.exit(0)
+
+    md_dir = Path(args.root) / str(args.market) / str(args.stock) / "derived"
+    mds = sorted(md_dir.glob("*.md"))
+    if not mds:
+        logger.error(f"{md_dir} 没有解析产物，先跑 ocr/cli.py")
+        sys.exit(1)
+    for md in mds:
+        if md.with_suffix(".toc.json").exists() and not args.force:
+            logger.info(f"跳过（已存在）: {md.name}")
+            continue
+        logger.info(f"构建 TOC: {md.name}")
+        build_toc(md)
 

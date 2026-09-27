@@ -46,3 +46,9 @@ VLLM_WSL2_ENABLE_PIN_MEMORY=1 vllm serve \
 
 ## 运行
 
+## trace view
+
+
+```
+uv run cagent/trace_web.py
+```

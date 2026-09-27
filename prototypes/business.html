@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>商业模式一张图 · 2025 年报</title>
+<style>
+  :root { --ink:#1c1b18; --mute:#8a8577; --paper:#faf8f3; --line:#e3ded2; --say:#3a5a8c; --do:#3d6b4f; --out:#a2543a; }
+  * { margin:0; box-sizing:border-box; }
+  body { background:var(--paper); color:var(--ink); font-family:"Noto Serif SC","Songti SC",serif; line-height:1.8; }
+  header { max-width:960px; margin:0 auto; padding:56px 32px 8px; }
+  header h1 { font-size:26px; font-weight:600; }
+  header p { color:var(--mute); font-size:13px; margin-top:6px; }
+  main { max-width:960px; margin:32px auto 80px; padding:0 32px; }
+  h2 { font-size:19px; font-weight:600; margin:56px 0 6px; }
+  h2 .no { color:var(--mute); font-size:13px; font-weight:400; margin-left:8px; }
+  .lead { color:var(--mute); font-size:13px; margin-bottom:24px; }
+
+  /* 产品矩阵 */
+  .brand { display:grid; grid-template-columns:92px 1fr 130px; gap:14px; align-items:center; padding:12px 0; border-top:1px solid var(--line); }
+  .brand .name { font-weight:600; font-size:15px; }
+  .brand .bar { height:10px; background:var(--line); position:relative; }
+  .brand .bar i { position:absolute; inset:0 auto 0 0; background:var(--do); }
+  .brand .vol { text-align:right; font-variant-numeric:tabular-nums; font-size:14px; }
+  .brand .vol b { font-weight:600; }
+  .brand .vol span { color:var(--mute); font-size:12px; }
+  .brand .pos { grid-column:2/4; color:var(--mute); font-size:13px; margin-top:-6px; }
+
+  /* 流程图 */
+  .flowwrap { border:1px solid var(--line); background:#fffdf8; padding:24px 12px 8px; overflow-x:auto; }
+  svg text { font-family:"Noto Serif SC","Songti SC",serif; }
+
+  /* 通用财务表 */
+  table.fin { width:100%; border-collapse:collapse; font-size:14px; margin-top:16px; }
+  table.fin th { text-align:left; font-weight:600; font-size:13px; color:var(--mute); border-bottom:1px solid var(--ink); padding:8px 10px 8px 0; }
+  table.fin td { border-bottom:1px solid var(--line); padding:10px 10px 10px 0; vertical-align:top; }
+  table.fin td.n { font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap; }
+  table.fin td .up { color:var(--do); font-weight:400; font-size:12px; }
+  table.fin td .dn { color:var(--out); font-weight:400; font-size:12px; }
+  table.fin td.src { color:var(--mute); font-size:12px; white-space:nowrap; }
+  .tag { display:inline-block; border:1px solid var(--line); border-radius:999px; padding:0 10px; font-size:12px; color:var(--mute); }
+
+  /* 资产结构条 / 现金流条 */
+  .stack { display:flex; height:34px; margin:14px 0 6px; }
+  .stack div { display:flex; align-items:center; justify-content:center; font-size:12.5px; color:#fff; }
+  .legend { color:var(--mute); font-size:12.5px; margin-bottom:8px; }
+  .cf { margin:10px 0; }
+  .cf .row { display:grid; grid-template-columns:150px 1fr 110px; gap:12px; align-items:center; margin:8px 0; font-size:14px; }
+  .cf .track { height:16px; background:var(--line); position:relative; }
+  .cf .track i { position:absolute; top:0; bottom:0; }
+  .cf .in i { background:var(--do); left:0; }
+  .cf .out .track { transform:none; }
+  .cf .out i { background:var(--out); right:0; }
+  .cf .amt { text-align:right; font-variant-numeric:tabular-nums; font-weight:600; }
+  .note { border-left:3px solid var(--line); padding:2px 0 2px 14px; color:var(--mute); font-size:13.5px; margin-top:18px; }
+  .note b { color:var(--ink); font-variant-numeric:tabular-nums; }
+  footer.site { max-width:960px; margin:0 auto; padding:24px 32px 64px; color:var(--mute); font-size:12px; border-top:1px solid var(--line); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>长城汽车 <span style="color:var(--mute);font-size:15px">商业模式一张图 · 2025 年报</span></h1>
+  <p>产品 → 经营流程（研产供销服）→ 财务落点 → 资产与现金流。每个数字都可回溯到年报披露位置。单年年报输入，与重放三形态无关。</p>
+</header>
+
+<main>
+
+  <h2>一 · 产品矩阵 <span class="no">卖什么 · 按 2025 销量</span></h2>
+  <p class="lead">柱长与销量成比例。定位语照抄年报品牌小节原文。</p>
+  <div id="brands"></div>
+
+  <h2>二 · 生意怎么做 <span class="no">naive 版：现金 → 原料 → 车 → 钱 → 现金，一年转一圈</span></h2>
+  <p class="lead">箭头上的数字都是 2025 年真实流量（合并现金流量表/资产负债表）。</p>
+  <div class="flowwrap">
+  <svg viewBox="0 0 960 430" width="100%" style="min-width:780px">
+    <defs>
+      <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9" fill="none" stroke="#1c1b18" stroke-width="1.4"/></marker>
+      <marker id="dash" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9" fill="none" stroke="#8a8577" stroke-width="1.2"/></marker>
+    </defs>
+
+    <!-- 供应商 -->
+    <rect x="70" y="44" width="190" height="76" fill="#fffdf8" stroke="#1c1b18"/>
+    <text x="165" y="72" text-anchor="middle" font-size="15" font-weight="bold">供应商</text>
+    <text x="165" y="93" text-anchor="middle" font-size="11" fill="#3a5a8c">「先货后款」</text>
+    <text x="165" y="110" text-anchor="middle" font-size="11">期末占款 <tspan font-weight="bold">796.5 亿</tspan></text>
+
+    <!-- 工厂 -->
+    <rect x="580" y="44" width="200" height="76" fill="#fffdf8" stroke="#1c1b18"/>
+    <text x="680" y="72" text-anchor="middle" font-size="15" font-weight="bold">工厂</text>
+    <text x="680" y="93" text-anchor="middle" font-size="11">人工付现 <tspan font-weight="bold">172.4 亿</tspan> · 存货 <tspan font-weight="bold">261.5 亿</tspan></text>
+    <text x="680" y="110" text-anchor="middle" font-size="11">产能 292.8 亿 · 年购建 115.1 亿</text>
+
+    <!-- 用户/经销商 -->
+    <rect x="580" y="270" width="200" height="88" fill="#fffdf8" stroke="#1c1b18"/>
+    <text x="680" y="296" text-anchor="middle" font-size="15" font-weight="bold">用户与经销商</text>
+    <text x="680" y="317" text-anchor="middle" font-size="11">买车 <tspan font-weight="bold">132.4 万辆</tspan> · 单车约 16.8 万</text>
+    <text x="680" y="334" text-anchor="middle" font-size="11">先款挂账 <tspan font-weight="bold">131.6 亿</tspan> · 赊欠 <tspan font-weight="bold">96.0 亿</tspan></text>
+    <text x="680" y="351" text-anchor="middle" font-size="10" fill="#8a8577">合同负债 · 应收账款</text>
+
+    <!-- 现金池 -->
+    <rect x="70" y="278" width="190" height="72" fill="#fffdf8" stroke="#3d6b4f" stroke-width="1.6"/>
+    <text x="165" y="306" text-anchor="middle" font-size="15" font-weight="bold">现金池</text>
+    <text x="165" y="327" text-anchor="middle" font-size="11">年末现金 <tspan font-weight="bold">252.8 亿</tspan></text>
+    <text x="165" y="344" text-anchor="middle" font-size="11">+ 理财 <tspan font-weight="bold">349.7 亿</tspan></text>
+
+    <!-- 四条主流 -->
+    <line x1="262" y1="82" x2="576" y2="82" stroke="#1c1b18" stroke-width="1.4" marker-end="url(#arr)"/>
+    <text x="419" y="72" text-anchor="middle" font-size="12" font-weight="bold">原材料</text>
+    <text x="419" y="99" text-anchor="middle" font-size="11" fill="#8a8577">一年用料付现 1,634.3 亿</text>
+
+    <line x1="680" y1="122" x2="680" y2="266" stroke="#1c1b18" stroke-width="1.4" marker-end="url(#arr)"/>
+    <text x="692" y="196" font-size="12" font-weight="bold">车</text>
+
+    <line x1="576" y1="314" x2="264" y2="314" stroke="#1c1b18" stroke-width="1.4" marker-end="url(#arr)"/>
+    <text x="420" y="304" text-anchor="middle" font-size="12" font-weight="bold">卖车回款 2,458.6 亿</text>
+    <text x="420" y="331" text-anchor="middle" font-size="11" fill="#8a8577">收现比 110%（收入 2,228.2 亿）</text>
+
+    <line x1="120" y1="274" x2="120" y2="124" stroke="#1c1b18" stroke-width="1.4" marker-end="url(#arr)"/>
+    <text x="108" y="196" text-anchor="end" font-size="11">付现</text>
+    <text x="108" y="212" text-anchor="end" font-size="11">1,634.3 亿</text>
+
+    <!-- 漏出 -->
+    <rect x="330" y="150" width="230" height="116" fill="none" stroke="#8a8577" stroke-dasharray="4 4"/>
+    <text x="445" y="174" text-anchor="middle" font-size="12" font-weight="bold" fill="#8a8577">一年还要流出</text>
+    <text x="345" y="198" font-size="11">税费 <tspan font-weight="bold">273.3 亿</tspan></text>
+    <text x="345" y="218" font-size="11">研发 <tspan font-weight="bold">104.3 亿</tspan></text>
+    <text x="345" y="238" font-size="11">购建产能 <tspan font-weight="bold">115.1 亿</tspan></text>
+    <text x="345" y="258" font-size="11">还债 194.5 亿 · 分红付息 43.8 亿</text>
+    <line x1="262" y1="292" x2="326" y2="252" stroke="#8a8577" stroke-dasharray="4 4" marker-end="url(#dash)"/>
+  </svg>
+  </div>
+  <div class="note">
+    naive 读法：上游先货后款（欠 796.5 亿）、下游先款后车（合同负债 131.6 亿 + 收现比 110%）——两头占款，生意本身几乎不垫钱。<br>
+    一年转下来：经营净流入 <b>403.6 亿</b>（净利润的 4.1 倍），扣掉产能、还债、分红后，沉淀为现金 252.8 亿 + 理财 349.7 亿。
+  </div>
+
+  <h2>三 · 财务落点 <span class="no">钱从哪来、花到哪去</span></h2>
+  <p class="lead">分产品、分地区、分费用。最后一列指出它对应上面哪个产品或环节。</p>
+  <table class="fin">
+    <tr><th>指标</th><th>数值</th><th>同比</th><th>落在</th><th>出处</th></tr>
+    <tr><td>营业收入</td><td class="n">2,228.24 亿元</td><td class="up">+10.20%，历史新高</td><td><span class="tag">全部环节之果</span></td><td class="src">财务回顾</td></tr>
+    <tr><td>销售汽车</td><td class="n">1,958.48 亿元</td><td class="up">+11.60% · 毛利率 17.29% <span class="dn">(-2.18pct)</span></td><td><span class="tag">产品</span></td><td class="src">主营业务分产品</td></tr>
+    <tr><td>　其中新能源</td><td class="n">814.77 亿元</td><td class="up">销量 40.60 万辆，+26.00%，占 30.7%</td><td><span class="tag">产品·新能源</span></td><td class="src">业务回顾</td></tr>
+    <tr><td>销售零配件</td><td class="n">136.66 亿元</td><td class="up">+6.45% · 毛利率 31.28% <span class="up">(+4.29pct)</span></td><td><span class="tag">产·供</span></td><td class="src">主营业务分产品</td></tr>
+    <tr><td>国内收入</td><td class="n">1,284.68 亿元</td><td class="up">+7.64% · 毛利率 18.61%</td><td><span class="tag">销·国内</span></td><td class="src">主营业务分地区</td></tr>
+    <tr><td>国外收入</td><td class="n">914.88 亿元</td><td class="up">+13.99% · 毛利率 16.70% · 占主营 41.6%</td><td><span class="tag">销·生态出海</span></td><td class="src">主营业务分地区</td></tr>
+    <tr><td>研发投入</td><td class="n">103.78 亿元</td><td class="dn">-1.05%</td><td><span class="tag">研</span></td><td class="src">研发投入表</td></tr>
+    <tr><td>销售费用</td><td class="n">112.73 亿元</td><td class="up">+43.93% · 费用率 5.06%（上年 3.87%）</td><td><span class="tag">销·渠道变革</span></td><td class="src">费用变动说明</td></tr>
+    <tr><td>归母净利润</td><td class="n">98.65 亿元</td><td class="dn">-22.07%</td><td><span class="tag">全部之果</span></td><td class="src">主要会计数据</td></tr>
+  </table>
+
+  <h2>四 · 资产结构 <span class="no">家底与变动理由 · 2025-12-31 经审计</span></h2>
+  <p class="lead">合并资产负债表。变动理由照抄年报「资产负债变动情况说明」。</p>
+
+  <div class="stack">
+    <div style="width:61.1%;background:#3d6b4f">流动资产 1,376.5 亿 · 61.1%</div>
+    <div style="width:38.9%;background:#8a8577">非流动 876.4 亿</div>
+  </div>
+  <div class="legend">资产总计 <b>2,252.88 亿元</b>（上年 2,177.20 亿，+3.5%）· 负债合计 1,373.96 亿（-1.0%）· 归母股东权益 878.92 亿（+11.3%）· 资产负债率 <b>61.0%</b>（上年 63.7%）</div>
+
+  <table class="fin">
+    <tr><th>科目</th><th>期末</th><th>同比</th><th>年报说明（照抄）</th></tr>
+    <tr><td>交易性金融资产</td><td class="n">349.66 亿</td><td class="up">+146.56%</td><td>购买理财产品增加所致</td></tr>
+    <tr><td>应收款项融资</td><td class="n">238.48 亿</td><td class="dn">-41.98%</td><td>直营模式现汇收款增加，以及票据背书增加所致</td></tr>
+    <tr><td>存货</td><td class="n">261.48 亿</td><td class="up">+2.8%</td><td></td></tr>
+    <tr><td>固定资产</td><td class="n">292.82 亿</td><td class="dn">-3.0%</td><td></td></tr>
+    <tr><td>在建工程</td><td class="n">57.60 亿</td><td class="up">+43.67%</td><td>报告期内新建生产线所致</td></tr>
+    <tr><td>无形资产 + 开发支出</td><td class="n">244.47 亿</td><td class="dn">-1.2%</td><td>技术与在研车型投入的资本化沉淀</td></tr>
+    <tr><td>应付票据 + 应付账款</td><td class="n">796.47 亿</td><td>基本持平</td><td>供应链占款，经营现金流的重要来源</td></tr>
+    <tr><td>长期借款</td><td class="n">10.69 亿</td><td class="dn">-83.63%</td><td>报告期偿还银行长期借款所致</td></tr>
+  </table>
+
+  <h2>五 · 现金流 <span class="no">钱怎么流动 · 2025 年度</span></h2>
+  <p class="lead">三个活动的净额，绿进红出。投资活动的大额进出主要是理财产品滚动，购建长期资产（产能）是 <b>115.1 亿</b>。</p>
+
+  <div class="cf">
+    <div class="row in"><div>经营活动</div><div class="track"><i style="width:100%"></i></div><div class="amt" style="color:var(--do)">+403.55 亿</div></div>
+    <div class="row out"><div>投资活动</div><div class="track"><i style="width:72.2%"></i></div><div class="amt" style="color:var(--out)">-291.54 亿</div></div>
+    <div class="row out"><div>筹资活动</div><div class="track"><i style="width:33.3%"></i></div><div class="amt" style="color:var(--out)">-134.45 亿</div></div>
+  </div>
+  <div class="legend">现金及现金等价物净减少 <b>19.53 亿</b>，年末余额 <b>252.81 亿</b>（上年 272.33 亿）· 销售商品收现 2,458.55 亿，收现比 110%</div>
+
+  <div class="note">
+    经营净额 <b>403.6 亿</b> 是净利润 <b>98.7 亿</b> 的 4.1 倍——折旧摊销不回血、供应链占款体系仍在运转。<br>
+    筹资连续净流出：全年偿还借款 <b>194.5 亿</b>、分红付息 <b>43.8 亿</b>，长期借款余额降至 <b>10.7 亿</b>。
+  </div>
+
+</main>
+
+<footer class="site">
+  数据：长城汽车 2025 年年度报告（601633）合并口径 · 每个数字注明披露位置，不做任何加工性评判 · 本页是商业模式分析 agent 的目标输出形态（输入为单年年报）
+</footer>
+
+<script>
+const brands = [
+  { name:"哈弗", vol:76.15, yoy:"+7.69%", pos:"「全球 SUV 专家」，主流都市/泛越野/越野三大品类，全球累计用户破 1,000 万" },
+  { name:"坦克", vol:23.44, yoy:"—", pos:"「铁汉柔情」智能豪华越野 SUV，中国越野 SUV 销量第一，累计超 83 万辆" },
+  { name:"长城皮卡", vol:17.89, yoy:"—", pos:"国内终端市占率近 50%，连续 28 年皮卡销量冠军，全球累计超 285 万辆" },
+  { name:"欧拉", vol:4.83, yoy:"—", pos:"从「精致女性」升级为「全球年轻的都市生活家」，单一纯电转向全动力覆盖" },
+  { name:"魏牌", vol:null, yoy:null, pos:"新能源高端 MPV 开山之作「高山」，2025 年 7-12 月全国 MPV 销量冠军" },
+  { name:"灵魂·重卡", vol:null, yov:null, pos:"两个新品类：水平对置 8 缸豪华摩托；Hi4-G 混动重卡，行业首创双电机混联" },
+];
+const max = Math.max(...brands.map(b => b.vol || 0));
+document.getElementById("brands").innerHTML = brands.map(b => `
+  <div class="brand">
+    <div class="name">${b.name}</div>
+    <div class="bar">${b.vol ? `<i style="width:${(b.vol / max * 100).toFixed(1)}%"></i>` : ""}</div>
+    <div class="vol">${b.vol ? `<b>${b.vol.toFixed(2)} 万辆</b> <span>${b.yoy}</span>` : "<span>未单列</span>"}</div>
+    <div class="pos">${b.pos}</div>
+  </div>`).join("");
+</script>
+
+</body>
+</html>
