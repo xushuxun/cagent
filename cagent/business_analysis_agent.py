@@ -89,13 +89,15 @@ def chunk_text(text: str, budget: int = 32768) -> list[str]:
 def revise(agent: Agent, business_description: str, new_pages: str) -> str:
     prompt = textwrap.dedent(f"""
         <requirements>
-        你在通读一份上市公司年报，要把这门生意的运行过程讲清楚。
-        输入是“现有生意过程描述”和“待阅读的年报页”，返回整合后的新版描述。
+        你在通读一份上市公司年报，要把这门生意的运行过程讲清楚
+        输入是“现有生意过程描述”和“待阅读的年报页”，返回整合后的新版描述
 
         规则：
-        - 只描述生意如何运转：业务产品、研发、采购、生产、销售、客户、资金流。
-        - 禁止分析财务数据、评价竞争力；不解释过程，不输出页码和章节名。
-        - 500-900 字，口吻与 <examples> 一致。
+        - 只描述生意如何运转：业务产品、研发、采购、生产、销售、客户、资金流
+        - 禁止分析财务数据、评价竞争力；不解释过程，不输出页码和章节名
+        - 每个事实必须能在 <pages> 或 <business_description> 中找到依据，禁止编撰
+        - 没有新信息时 updated=false，description 原样返回 <business_description>
+        - 参考 <examples>，长度控制在1000字以内
         </requirements>
 
         <examples>
@@ -110,10 +112,28 @@ def revise(agent: Agent, business_description: str, new_pages: str) -> str:
         {new_pages}
         </pages>
     """).strip()
-    return agent.chat(
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0,
+    response_format = {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "revise",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "updated": {"type": "boolean"},
+                    "description": {"type": "string"},
+                },
+                "required": ["updated", "description"],
+            },
+        },
+    }
+    response = json.loads(
+        agent.chat(
+            messages=[{"role": "user", "content": prompt}],
+            response_format=response_format,
+            temperature=0,
+        )
     )
+    return response["description"] if response["updated"] else business_description
 
 
 def gen_business_description(agent: Agent, text: str, business_description: str = "") -> str:
