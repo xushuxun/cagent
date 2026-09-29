@@ -23,6 +23,14 @@ class Agent:
         response.raise_for_status()
         return response.json()["tokens"]
 
+    def n_ctx(self) -> int:
+        """服务端上下文长度（llama.cpp /props），结果缓存。"""
+        if not hasattr(self, "_n_ctx"):
+            response = requests.get(f"{self.base_url.removesuffix('/v1')}/props")
+            response.raise_for_status()
+            self._n_ctx: int = response.json()["default_generation_settings"]["n_ctx"]
+        return self._n_ctx
+
     def chat(self, messages: list[dict], **params) -> str:
         """对应 openai sdk 的 client.chat.completions.create，入参 messages，返回 content 字符串。"""
         url = f"{self.base_url}/chat/completions"

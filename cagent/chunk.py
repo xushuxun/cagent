@@ -350,12 +350,13 @@ def load_chapters(md_path: Path) -> list[dict]:
 
 
 class Toc:
-    """年报目录：章节列表 + 页码范围。原始 md 归调用方。"""
+    """年报目录：章节列表 + 页码范围，以及原始 md。"""
 
     def __init__(self, md_path: str | Path):
         md_path = Path(md_path)
         self.chapters = load_toc(md_path)  # [{"title", "page", "md_page"}]
-        self.n_pages = len(split_pages(md_path.read_text(encoding="utf-8")))
+        self.text = md_path.read_text(encoding="utf-8")
+        self.n_pages = len(split_pages(self.text))
 
     def range(self, ch: dict) -> tuple[int, int]:
         """章节的 md 页码范围 (start, end)。"""
@@ -364,6 +365,12 @@ class Toc:
         end = self.chapters[i + 1]["md_page"] - 1 if i + 1 < len(self.chapters) else self.n_pages
         return start, end
 
+    def chapter_text(self, i: int) -> str:
+        """原始 md 中第 i 章页码范围对应的原文（含页标记）。"""
+        lo, hi = self.range(self.chapters[i])
+        start = self.text.index(f"<!-- page {lo} -->")
+        end = self.text.find(f"<!-- page {hi + 1} -->")
+        return self.text[start : end if end != -1 else len(self.text)]
 
 
 def build_toc(md_path: Path) -> None:

@@ -49,18 +49,29 @@ def upsert_index(company_dir: Path, market: str, code: str, name: str, entry: di
     _dump_index(idx_path, index)
 
 
-def cleanup_orphans(company_dir: Path, expected_filenames: set[str]) -> int:
-    """删除本地多余 PDF 文件并更新 index.json，返回删除数量。"""
+def cleanup_orphans(company_dir: Path, expected_filenames: set[str], kind: str) -> int:
+    """删除本次 kind 下本地多余的 PDF 并同步 index.json，返回删除数量。
+
+    只动 index.json 里登记为同一 kind 的文件；其他 kind（如年报 vs 招股书）
+    混在同一目录，互不清理。不在 index 里的文件视为未知，保留。
+    """
     idx_path = company_dir / "index.json"
-    orphans = [f for f in company_dir.iterdir() if f.is_file() and f.name != "index.json" and f.name not in expected_filenames]
+    index = json.loads(idx_path.read_text(encoding="utf-8")) if idx_path.exists() else {}
+    filings = [r for r in index.get("filings", []) if isinstance(r, dict)]
+    kind_files = {r["file"] for r in filings if r.get("kind", "annual") == kind}
+
+    orphans = [
+        f
+        for f in company_dir.iterdir()
+        if f.is_file() and f.name in kind_files and f.name not in expected_filenames
+    ]
     for f in orphans:
         log.info(f"  删除多余文件: {f.name}")
         f.unlink()
-    if orphans and idx_path.exists():
-        index = json.loads(idx_path.read_text(encoding="utf-8"))
-        kept = [r for r in index.get("filings", []) if r.get("file") in expected_filenames]
-        if len(kept) < len(index.get("filings", [])):
-            log.info(f"  index.json 已清理 {len(index['filings']) - len(kept)} 条旧条目")
-            index["filings"] = kept
-            _dump_index(idx_path, index)
+
+    kept = [r for r in filings if not (r.get("kind", "annual") == kind and r["file"] not in expected_filenames)]
+    if idx_path.exists() and len(kept) < len(filings):
+        log.info(f"  index.json 已清理 {len(filings) - len(kept)} 条旧条目")
+        index["filings"] = kept
+        _dump_index(idx_path, index)
     return len(orphans)

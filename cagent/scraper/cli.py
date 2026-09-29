@@ -65,7 +65,7 @@ def _try_download(market: str, s: dict, i: int, total: int) -> str | None:
     code, name = s["code"], s.get("name", "")
     log.info(f"[{market} {i}/{total}] {code} {name}")
     try:
-        SCRAPERS[market](code, Path(args.output), args.date_from, args.date_to, force=args.force)
+        SCRAPERS[market](code, Path(args.output), args.date_from, args.date_to, force=args.force, kind=args.kind)
         return None
     except Exception as exc:
         log.error(f"  [FAIL] {code} {name}（{exc}）")
@@ -89,7 +89,7 @@ def run_single() -> int:
     if args.market not in SCRAPERS:
         parser.error("单只模式要求 --market 指定 cn 或 hk")
     if args.search:
-        filings = SEARCHERS[args.market](args.stock, parse_date(args.date_from), parse_date(args.date_to))
+        filings = SEARCHERS[args.market](args.stock, parse_date(args.date_from), parse_date(args.date_to), kind=args.kind)
         print(json.dumps(filings, ensure_ascii=False, indent=2))
     else:
         SCRAPERS[args.market](
@@ -98,6 +98,7 @@ def run_single() -> int:
             args.date_from,
             args.date_to,
             force=args.force,
+            kind=args.kind,
         )
     return 0
 
@@ -133,6 +134,12 @@ if __name__ == "__main__":
         help="单只模式必填 cn/hk；批量模式忽略",
     )
     parser.add_argument("--search", action="store_true", help="单只模式：只打印检索结果 JSON，不下载")
+    parser.add_argument(
+        "--kind",
+        choices=["annual", "prospectus"],
+        default="annual",
+        help="文档类型：annual 年报 / prospectus 招股说明书（港股为招股章程）",
+    )
     parser.add_argument(
         "--list",
         dest="list_file",

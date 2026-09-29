@@ -48,13 +48,24 @@ DEFAULT_HEADERS = {
     "Referer": "https://www.cninfo.com.cn/new/commonUrl/pageOfSearch?url=disclosure/list/search",
 }
 
-# 年报分类代码（服务端过滤）
-ANNUAL_REPORT_CATEGORY = "category_ndbg_szsh"
+# 公告检索方式（服务端过滤）：年报用分类码，招股说明书用标题关键词
+# （实测 category_zgsms_szsh 会被巨潮忽略、返回全部公告，searchkey 才生效）
+SEARCHKEYS = {
+    "annual": ("category_ndbg_szsh", ""),  # 年度报告
+    "prospectus": ("", "招股说明书"),  # 招股说明书
+}
 
 
 def is_annual_report(title: str) -> bool:
     """标题含“年度报告”，且排除摘要、英文版等非正文文件。"""
     return "年度报告" in title and "摘要" not in title and "英文" not in title
+
+
+def is_prospectus(title: str) -> bool:
+    """标题含招股说明书/招股意向书，排除摘要、英文版、申报稿等非最终稿。"""
+    if "招股说明书" not in title and "招股意向书" not in title:
+        return False
+    return not any(k in title for k in ("摘要", "英文", "上会稿", "注册稿", "申报稿", "提示性公告"))
 
 
 @lru_cache(maxsize=1)
@@ -84,7 +95,8 @@ def _build_stock_param(code: str) -> str:
     return f"{code},{info['orgId']}" if info.get("orgId") else code
 
 
-def _fetch_page(stock_param: str, se_date: str, page_num: int) -> dict:
+def _fetch_page(stock_param: str, se_date: str, page_num: int, kind: str) -> dict:
+    category, searchkey = SEARCHKEYS[kind]
     payload = {
         "pageNum": str(page_num),
         "pageSize": "30",
@@ -92,9 +104,9 @@ def _fetch_page(stock_param: str, se_date: str, page_num: int) -> dict:
         "tabName": "fulltext",
         "plate": "",
         "stock": stock_param,
-        "searchkey": "",
+        "searchkey": searchkey,
         "secid": "",
-        "category": ANNUAL_REPORT_CATEGORY,
+        "category": category,
         "trade": "",
         "seDate": se_date,
         "sortName": "",
@@ -122,10 +134,10 @@ def _parse_announcement(ann: dict) -> dict:
     }
 
 
-def fetch_annual_reports(stock: str, date_from: str, date_to: str) -> list[dict]:
-    """拉取年报公告（服务端按年报分类过滤），翻页直到取完。"""
+def fetch_filings(stock: str, date_from: str, date_to: str, kind: str) -> list[dict]:
+    """拉取公告（服务端按分类过滤），翻页直到取完。"""
     stock_param, se_date = _build_stock_param(stock), f"{date_from}~{date_to}"
-    page1 = _fetch_page(stock_param, se_date, 1)
+    page1 = _fetch_page(stock_param, se_date, 1, kind)
     total_pages = page1.get("totalpages", 1)
     log.info(f"共 {page1.get('totalRecordNum', 0)} 条公告，{total_pages} 页")
 
@@ -133,7 +145,7 @@ def fetch_annual_reports(stock: str, date_from: str, date_to: str) -> list[dict]
     for page_num in range(2, total_pages + 1):
         time.sleep(REQUEST_INTERVAL)
         log.info(f"请求第 {page_num}/{total_pages} 页...")
-        pages.append(_fetch_page(stock_param, se_date, page_num))
+        pages.append(_fetch_page(stock_param, se_date, page_num, kind))
 
     announcements = [a for p in pages for a in p.get("announcements") or []]
     if not announcements:
@@ -141,15 +153,23 @@ def fetch_annual_reports(stock: str, date_from: str, date_to: str) -> list[dict]
     return [_parse_announcement(a) for a in announcements]
 
 
-def search_filings(stock_code: str, date_from: datetime | None = None, date_to: datetime | None = None) -> list[dict]:
-    """搜索年报元数据（服务端按年报分类过滤，再按标题排除摘要/英文版）。"""
+def search_filings(
+    stock_code: str,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    kind: str = "annual",
+) -> list[dict]:
+    """搜索文档元数据（服务端按分类过滤，再按标题排除摘要/英文版）。kind: annual/prospectus。"""
+    if kind not in SEARCHKEYS:
+        raise ValueError(f"未知 kind: {kind}")
     today = datetime.now()
     date_from, date_to = date_from or today - timedelta(days=5 * 365), date_to or today
-    log.info(f"开始搜索: 股票={stock_code}, 区间 {date_from:%Y-%m-%d} ~ {date_to:%Y-%m-%d}")
+    log.info(f"开始搜索: 股票={stock_code}, kind={kind}, 区间 {date_from:%Y-%m-%d} ~ {date_to:%Y-%m-%d}")
 
-    announcements = fetch_annual_reports(stock_code, date_from.strftime("%Y-%m-%d"), date_to.strftime("%Y-%m-%d"))
-    kept = [r for r in announcements if r["adjunctType"].upper() == "PDF" and is_annual_report(r["title"])]
-    log.info(f"搜索完成：命中 {len(announcements)} 条，滤除非 PDF 与摘要/英文版后保留 {len(kept)} 条")
+    announcements = fetch_filings(stock_code, date_from.strftime("%Y-%m-%d"), date_to.strftime("%Y-%m-%d"), kind)
+    keep = is_annual_report if kind == "annual" else is_prospectus
+    kept = [r for r in announcements if r["adjunctType"].upper() == "PDF" and keep(r["title"])]
+    log.info(f"搜索完成：命中 {len(announcements)} 条，滤除非 PDF 与无关公告后保留 {len(kept)} 条")
     return kept
 
 
@@ -165,6 +185,7 @@ def _download_one(
     root: Path,
     market: str,
     force: bool,
+    kind: str,
     i: int,
     total: int,
 ) -> str:
@@ -184,6 +205,7 @@ def _download_one(
         "fileSize": f.get("adjunctSize", 0),
         "secCode": sec_code,
         "secName": f.get("secName", ""),
+        "kind": kind,
     }
     try:
         if path.exists() and not force:
@@ -216,7 +238,7 @@ def _download_one(
         return "fail"
 
 
-def download_filings(filings: list[dict], root: Path, market: str, force: bool = False) -> None:
+def download_filings(filings: list[dict], root: Path, market: str, force: bool = False, kind: str = "annual") -> None:
     """按 lakehouse 规范（仓库 lakehouse/README.md）串行下载年报 PDF 并维护 index.json。
 
     增量安全（默认）：不覆盖已有 PDF、不删本地条目、合并保留本地额外字段；
@@ -226,12 +248,12 @@ def download_filings(filings: list[dict], root: Path, market: str, force: bool =
     --force 模式：覆盖已有 PDF 并清理本地多余文件，使本地目录与搜索结果精确同步。
     """
     sess = requests.Session()
-    stats = Counter(_download_one(sess, f, root, market, force, i, len(filings)) for i, f in enumerate(filings, 1))
+    stats = Counter(_download_one(sess, f, root, market, force, kind, i, len(filings)) for i, f in enumerate(filings, 1))
 
     if force and filings:
         company_dir = root / market / filings[0].get("secCode", "unknown")
         expected = {_filename(f) for f in filings if f.get("pdfUrl")}
-        if removed := cleanup_orphans(company_dir, expected):
+        if removed := cleanup_orphans(company_dir, expected, kind):
             log.info(f"已清理 {removed} 个多余 PDF 文件")
 
     log.info(f"下载完成: {stats['ok']} 新下载, {stats['skip']} 已存在跳过, {stats['fail']} 失败")
@@ -243,11 +265,13 @@ def download_stock(
     date_from: str = "",
     date_to: str = "",
     force: bool = False,
+    kind: str = "annual",
 ) -> None:
-    """搜索并下载单只股票的年报到 lakehouse（函数调用入口，供批量脚本使用）。
+    """搜索并下载单只股票的文档到 lakehouse（函数调用入口，供批量脚本使用）。
 
     日期参数为 YYYY-MM-DD 字符串，空串表示用内置默认（近5年起、至今）。
+    kind: annual（年报）/ prospectus（招股说明书）。
     """
-    filings = search_filings(stock_code, parse_date(date_from), parse_date(date_to))
-    log.info(f"共找到 {len(filings)} 条年报")
-    download_filings(filings, output, "cn", force=force)
+    filings = search_filings(stock_code, parse_date(date_from), parse_date(date_to), kind)
+    log.info(f"共找到 {len(filings)} 条")
+    download_filings(filings, output, "cn", force=force, kind=kind)
