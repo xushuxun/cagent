@@ -47,66 +47,48 @@
   .nums dd small { font-size:11px; color:var(--mute); font-weight:400; margin-left:4px; }
 
   .prose p { margin:8px 0; font-size:14px; text-align:justify; }
-  .quote { border-left:2px solid var(--accent); padding:2px 0 2px 10px; margin:8px 0; font-size:13.5px; }
-  .quote footer { color:var(--mute); font-size:12px; margin-top:1px; }
+  .chain { display:flex; align-items:stretch; margin:10px 0 6px; }
+  .chain .step { flex:1; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:6px 7px; font-size:11.5px; color:#2c2a26; }
+  .chain .step b { display:block; text-align:center; font-size:12.5px; color:var(--ink); margin-bottom:2px; }
+  .chain .to { flex:none; align-self:center; color:var(--mute); padding:0 2px; font-size:13px; }
+  .return { border:1px dashed var(--line); border-radius:6px; padding:5px 10px; margin:0 0 8px; font-size:12px; color:var(--mute); text-align:center; }
+  .tree { margin:10px 0; }
+  .tree .tier { display:flex; gap:8px; justify-content:center; }
+  .tree .card { flex:1; max-width:290px; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:6px 10px; font-size:12px; color:#2c2a26; }
+  .tree .card b { display:block; text-align:center; font-size:12.5px; color:var(--ink); margin-bottom:2px; }
+  .tree .card.top { flex:none; min-width:340px; }
+  .tree .conn { text-align:center; color:var(--mute); font-size:12px; line-height:1.1; }
   .note { background:var(--panel); border-radius:6px; padding:8px 12px; margin:10px 0; color:var(--mute); font-size:12.5px; }
   .note b { color:var(--ink); font-variant-numeric:tabular-nums; }
 
   footer.site { max-width:1200px; margin:0 auto; padding:14px 32px 40px 232px; color:var(--mute); font-size:12px; border-top:1px solid var(--line); }
-  @media (max-width:860px) { aside { display:none; } footer.site { padding-left:32px; } }
+  @media (max-width:860px) { aside { display:none; } footer.site { padding-left:32px; }
+    .chain { flex-direction:column; gap:4px; } .chain .to { transform:rotate(90deg); padding:0; }
+    .tree .tier { flex-direction:column; align-items:center; } .tree .card, .tree .card.top { max-width:100%; width:100%; min-width:0; } }
 </style>
 </head>
 <body>
 
-<div class="topbar"><b>长城汽车 · 2025 年年度报告摘要</b><span>601633.SH / 02333.HK · 合并口径 · 引文逐字摘自年报 · 数字经过程序核验</span></div>
+<div class="topbar"><b>长城汽车 · 2025 年年度报告摘要</b><span>601633.SH / 02333.HK</span></div>
 
 <div class="layout">
 <aside>
   <div class="nav-title">目录</div>
-  <a href="#s1">五年统计</a>
-  <a href="#s2">公司业务</a>
-  <a class="sub" href="#s2-1">业务说明</a>
-  <a class="sub" href="#s2-2">产品与品牌结构</a>
-  <a class="sub" href="#s2-3">单车指标</a>
-  <a class="sub" href="#s2-4">经营循环</a>
-  <a href="#s3">管理层观点</a>
-  <a href="#s4">经营成果与财务状况</a>
-  <a class="sub" href="#s4-1">收入结构</a>
-  <a class="sub" href="#s4-2">费用结构</a>
-  <a class="sub" href="#s4-3">资产负债主要变动</a>
-  <a class="sub" href="#s4-4">现金流量</a>
-  <a href="#s5">数据口径说明</a>
-  <a href="#s6">后续跟踪事项</a>
+  <a href="#s1">生意过程简介</a>
+  <a class="sub" href="#s1-1">业务说明</a>
+  <a class="sub" href="#s1-2">经营过程</a>
+  <a href="#s2">主要产品</a>
+  <a href="#s3">公司人事组织架构</a>
+  <a class="sub" href="#s3-1">组织架构</a>
+  <a class="sub" href="#s3-3">高级管理人员</a>
+  <a class="sub" href="#s3-4">员工构成</a>
 </aside>
 
 <main>
 
-<h2 id="s1">五年统计</h2>
+<h2 id="s1">生意过程简介</h2>
 
-<table class="stats">
-  <tr><th>指标（亿元）</th><th>2025</th><th>2024</th><th>2023</th><th>2022</th><th>2021</th></tr>
-  <tr class="hl"><td>营业收入</td><td class="n">2,228.24</td><td class="n">2,021.94</td><td class="n">1,732.00</td><td class="n">1,373.40</td><td class="n">1,364.05</td></tr>
-  <tr><td>归母净利润</td><td class="n">98.65</td><td class="n">126.60</td><td class="n">70.11</td><td class="n">82.66</td><td class="n">67.26</td></tr>
-  <tr><td>扣非净利润</td><td class="n">60.59</td><td class="n">96.95</td><td class="n">48.23</td><td class="n">44.76</td><td class="n">42.03</td></tr>
-  <tr><td>经营现金流净额</td><td class="n">403.55</td><td class="n">277.71</td><td class="n">177.23</td><td class="n">123.10</td><td class="n">353.16</td></tr>
-</table>
-
-<div class="nums">
-  <div><dt>整车销量</dt><dd>132.37<small>万辆 · +6.47%</small></dd></div>
-  <div><dt>单车收入</dt><dd>16.8<small>万元 · 推算值</small></dd></div>
-  <div><dt>综合毛利率</dt><dd>18.04<small>% · 上年 19.51%</small></dd></div>
-  <div><dt>经营净现比</dt><dd>4.1<small>倍</small></dd></div>
-  <div><dt>收现比</dt><dd>110<small>%</small></dd></div>
-  <div><dt>海外收入占主营</dt><dd>41.6<small>%</small></dd></div>
-  <div><dt>销售费用率</dt><dd>5.06<small>% · 上年 3.87%</small></dd></div>
-  <div><dt>资产负债率</dt><dd>61.0<small>% · 上年 63.7%</small></dd></div>
-</div>
-
-<div class="note">五年维度：营收由 1,364.05 亿元增至 2,228.24 亿元，扣非净利润基本持平，经营现金流净额由 353.16 亿元增至 403.55 亿元。2025 年经营净额 403.55 亿元为归母净利润的 4.1 倍，利润与现金的裂口主要来自折旧摊销与供应链占款。</div>
-
-<h2 id="s2">公司业务</h2>
-
-<h3 id="s2-1">业务说明</h3>
+<h3 id="s1-1">业务说明</h3>
 <div class="prose">
 <p>长城汽车是一家全球化智能科技公司，业务涵盖汽车及零部件的设计、研发、生产、销售和服务。公司坚持“ONE GWM”品牌战略，拥有哈弗、坦克、魏牌、欧拉、长城皮卡、长城灵魂及商用车等品牌，产品覆盖 SUV、皮卡、轿车、MPV 及摩托车、重卡等品类，动力涵盖汽油、柴油、纯电、混动、插混及氢能。</p>
 <p>公司的研发模式为自主研发，聚焦核心技术，构建起以 Hi4 电混、柠檬混动、坦克平台、归元平台及 VLA 智能驾驶大模型为核心的技术体系。公司实现了核心零部件的垂直整合，并通过收购无锡芯动半导体股权加强芯片布局。采购方面，公司向上游供应商采购原材料、零部件及模具，对主要供应商保持分散采购。生产模式为自主制造，公司在国内及泰国、巴西等地拥有全工艺整车生产基地，在厄瓜多尔、马来西亚等地拥有 KD 工厂，实现产能在地化。销售模式以经销为主，辅以加速构建的直连用户新渠道，通过 1,500 多家海外销售渠道及国内经销商网络覆盖市场。交付环节，公司通过经销商向终端用户交付整车，并提供售后服务。</p>
@@ -114,9 +96,25 @@
 <p>资金流方面，公司的资金来源为整车及零部件销售回款、银行借款及汇兑收益；资金流出主要为向上游支付的原材料及零部件采购款、研发人员薪酬、工厂建设资本开支及销售宣传费用。公司通过经营性现金流及银行借款满足日常经营。</p>
 </div>
 
-<h3 id="s2-2">产品与品牌结构</h3>
+<h3 id="s1-2">经营过程</h3>
+<div class="chain">
+  <div class="step"><b>研发</b>核心技术自研，零部件垂直整合</div>
+  <div class="to">→</div>
+  <div class="step"><b>采购</b>分散采购，先货后款</div>
+  <div class="to">→</div>
+  <div class="step"><b>生产</b>全工艺基地与 KD 工厂，产能在地化</div>
+  <div class="to">→</div>
+  <div class="step"><b>销售</b>经销为主、直连用户为辅，海外 1,500+ 渠道</div>
+  <div class="to">→</div>
+  <div class="step"><b>交付</b>经销商交付整车与售后，先款挂账与赊欠并存</div>
+  <div class="to">→</div>
+  <div class="step"><b>回款</b>销售回款为主，银行借款为辅</div>
+</div>
+<div class="return">↩ 资金回流：回款覆盖采购、薪酬、资本开支与宣传费用，结余沉淀为现金及理财，支持下一轮研发与产能投入</div>
+
+<h2 id="s2">主要产品</h2>
 <table>
-  <tr><th>品牌</th><th>销量</th><th>同比</th><th>定位（年报原文）</th></tr>
+  <tr><th>品牌</th><th>销量</th><th>同比</th><th>定位</th></tr>
   <tr><td>哈弗</td><td class="n">76.15 万辆</td><td class="src">+7.69%</td><td class="q">「全球 SUV 专家」，全球累计用户破 1,000 万</td></tr>
   <tr><td>坦克</td><td class="n">23.44 万辆</td><td class="src">—</td><td class="q">「铁汉柔情」智能豪华越野 SUV，累计超 83 万辆</td></tr>
   <tr><td>长城皮卡</td><td class="n">17.89 万辆</td><td class="src">—</td><td class="q">连续 28 年皮卡销量冠军，全球累计超 285 万辆</td></tr>
@@ -126,106 +124,57 @@
   <tr><td>其中新能源</td><td class="n">40.60 万辆</td><td class="src">+26.00%</td><td class="q">占总销量 30.7%</td></tr>
 </table>
 
-<h3 id="s2-3">单车指标</h3>
+<h2 id="s3">公司人事组织架构</h2>
+
+<h3 id="s3-1">组织架构</h3>
+<div class="tree">
+  <div class="tier"><div class="card top"><b>董事会 · 8 人</b>执行董事 3 · 职工董事 1 · 非执行董事 1 · 独立非执行董事 3</div></div>
+  <div class="conn">│</div>
+  <div class="tier">
+    <div class="card"><b>审计委员会</b>3 独董 + 1 非执行；审阅年报与内控，行使原监事会职权</div>
+    <div class="card"><b>薪酬委员会</b>1 执行 + 2 独董；董事及高管薪酬政策与待遇</div>
+    <div class="card"><b>提名委员会</b>1 执行 + 2 独董；董事会构成与选人标准</div>
+    <div class="card"><b>战略及可持续发展委员会</b>2 执行 + 1 非执行 + 2 独董；战略方向与可持续发展事务</div>
+  </div>
+  <div class="conn">│</div>
+  <div class="tier"><div class="card top"><b>经营层</b>总经理穆峰负责整体管理；副总经理赵国庆主管运营及配套采购；财务总监李红栓兼任董事会秘书</div></div>
+  <div class="conn">│</div>
+  <div class="tier">
+    <div class="card"><b>品牌公司矩阵</b>GWM 母品牌引领：哈弗、坦克、魏牌、欧拉、长城皮卡、灵魂、商用车；以用户为中心的组织变革，全面 To C</div>
+    <div class="card"><b>职能条线</b>研发、采购、生产、销售、服务全链路，研产供销服按生态出海布局</div>
+    <div class="card"><b>体外生态企业</b>蜂巢能源（电池）、毫末智行（智能驾驶）、光束汽车（与宝马合资）、极电光能</div>
+  </div>
+</div>
+
+<div class="note">2025 年公司不再设置监事会，《公司法》规定的监事会职权由董事会审计委员会行使。董事长魏建军 1990 年加入公司，管理层均为内部提拔。</div>
+
+<h3 id="s3-3">高级管理人员</h3>
 <table>
-  <tr><th>项</th><th>数值</th><th>算法</th></tr>
-  <tr><td>单车收入</td><td class="n">16.8 万元</td><td>汽车销售 1,958.48 亿元 ÷ 整车销量 132.37 万辆</td></tr>
-  <tr><td>销售商品收现</td><td class="n">2,458.55 亿元</td><td>收现比 110%，含预收款与税款</td></tr>
+  <tr><th>姓名</th><th>职务</th><th>分管</th><th>税前薪酬（万元）</th></tr>
+  <tr><td>魏建军</td><td>董事长、执行董事</td><td class="q">集团整体战略规划及业务发展；1990 年加入，2001 年 6 月至今任董事长；兼任控股股东创新长城资管董事长、总经理</td><td class="n">566.18</td></tr>
+  <tr><td>穆峰</td><td>总经理</td><td class="q">整体管理；2007 年加入，历任研发负责人、商品战略负责人、整车业务负责人，2022 年 7 月至今任总经理</td><td class="n">646.08</td></tr>
+  <tr><td>赵国庆</td><td>副董事长、执行董事、副总经理</td><td class="q">运营及配套采购；2000 年加入，2010 年 6 月至今任副总经理；兼任光束汽车董事长</td><td class="n">381.36</td></tr>
+  <tr><td>李红栓</td><td>执行董事、财务总监、董事会秘书及公司秘书</td><td class="q">财务与资本运作；注册会计师，2007 年加入，从事财务管理 19 年，2020 年 6 月至今任财务总监</td><td class="n">231.35</td></tr>
 </table>
 
-<h3 id="s2-4">经营循环</h3>
+<div class="note">董事会其余成员：职工董事卢彩娟（2025 年 8 月由监事会主席转任）、非执行董事何平、独立非执行董事范辉（财务背景）、乐英（高校机械专业）、邹兆麟（香港律师、公司治理）。本届任期至 2026 年 6 月。</div>
+
+<h3 id="s3-4">员工构成</h3>
 <table>
-  <tr><th>环节</th><th>经营模式</th><th>数字（亿元）</th><th>出处</th></tr>
-  <tr><td>上游</td><td>向供应商采购原材料及零部件，先货后款，期末形成占款</td><td class="n">796.47</td><td class="src">应付票据+应付账款</td></tr>
-  <tr><td>工厂</td><td>购建产能付现、人工付现，期末持有存货</td><td class="n">115.1 / 172.4 / 261.5</td><td class="src">现金流量表 / 资产负债表</td></tr>
-  <tr><td>下游</td><td>对用户与经销商先款挂账与赊欠并存</td><td class="n">131.6 / 96.0</td><td class="src">合同负债 / 应收账款</td></tr>
-  <tr><td>其他流出</td><td>税费、研发付现、偿还借款、分红付息</td><td class="n">273.3 / 104.3 / 194.5 / 43.8</td><td class="src">现金流量表</td></tr>
-  <tr><td>年末沉淀</td><td>现金及等价物与理财产品</td><td class="n">252.8 / 349.7</td><td class="src">资产负债表</td></tr>
-</table>
-
-<div class="note">公司对上游先货后款（期末占款 796.47 亿元），对下游先款后车（合同负债 131.57 亿元，收现比 110%），生意本身几乎不垫钱，经营现金流常年高于净利润。</div>
-
-<h2 id="s3">管理层观点</h2>
-
-<div class="quote">2025 年，在政策利好、供给丰富和基础设施持续改善等多重因素共同作用下，新能源汽车持续增长，产销量突破 1,600 万辆……新能源汽车新车销量达到汽车新车总销量的 47.94%，较去年同期提高 7 个百分点。<footer>第三节 · 行业格局和趋势</footer></div>
-<div class="quote">2025 年汽车出口突破 700 万辆，同比增长约 20%，规模再创新高……新能源汽车出口占比大幅提升，从产品出口转向技术、品牌、产能全链条出海。<footer>第三节 · 行业格局和趋势</footer></div>
-<div class="quote">排名前五位的皮卡生产企业销量合计为 41.49 万辆，占皮卡销售总量的 68.14%，行业格局集中。<footer>第三节 · 行业格局和趋势</footer></div>
-<div class="quote">根据中汽协预测，2026 年我国汽车总销量预计将达到 3,475 万辆，微增 1%……新能源汽车预计为 1,900 万辆，增长 15.2%；汽车出口量预计为 740 万辆，小幅增长 4.3%。<footer>第三节 · 行业格局和趋势 · 管理层引外部预测</footer></div>
-<div class="quote">长城汽车迎来成立 35 周年的重要里程碑，公司始终坚持研发创新、坚持长期主义、坚持高质量发展。<footer>第二节 · 董事长致辞</footer></div>
-<div class="quote">坚持以“用户为中心，笃行全球化，拥抱新能源，坚持长期主义和高质量发展” 的战略目标，持续推进 “ONE GWM” 全球品牌行动纲领。<footer>第二节 · 董事长致辞</footer></div>
-<div class="quote">长城汽车持续推进 “ONE GWM” 全球品牌行动纲领，围绕产能在地化、经营本土化、品牌跨文化、供应链安全化构成的 “国际新四化” 战略，以 “生态出海” 模式替代单纯产品输出，实现研、产、供、销、服全产业链深耕。<footer>第三节 · 公司发展战略</footer></div>
-<div class="quote">销售费用增加的主要原因是：报告期公司加速构建直连用户的新渠道模式，以及加大新车型、新技术的上市宣传及品牌提升。<footer>第三节 · 费用变动说明</footer></div>
-<div class="quote">长城汽车推出全球首个原生 AI 全动力汽车平台——归元平台，兼容汽油、柴油、纯电、混动、插混、氢能等多种动力形式和 7 大车型品类。<footer>第三节 · 业务回顾</footer></div>
-<div class="quote">构建以 VLA 模型与世界模型为核心的全新技术体系，VLA 辅助驾驶大模型正式落地。<footer>第三节 · 业务回顾</footer></div>
-
-<h2 id="s4">经营成果与财务状况</h2>
-
-<h3 id="s4-1">收入结构</h3>
-<table>
-  <tr><th>口径</th><th>金额</th><th>同比</th><th>毛利率</th><th>对应环节</th></tr>
-  <tr><td>销售汽车</td><td class="n">1,958.48 亿</td><td class="src">+11.60%</td><td class="src">17.29% <span class="dn">-2.18pct</span></td><td class="src">产品</td></tr>
-  <tr><td>　其中新能源</td><td class="n">814.77 亿</td><td class="src">销量 40.60 万辆 +26.00%</td><td class="src">占 30.7%</td><td class="src">产品·新能源</td></tr>
-  <tr><td>销售零配件</td><td class="n">136.66 亿</td><td class="src">+6.45%</td><td class="src">31.28% <span class="up">+4.29pct</span></td><td class="src">产·供</td></tr>
-  <tr><td>国内</td><td class="n">1,284.68 亿</td><td class="src">+7.64%</td><td class="src">18.61%</td><td class="src">销·国内</td></tr>
-  <tr><td>国外</td><td class="n">914.88 亿</td><td class="src">+13.99%</td><td class="src">16.70%</td><td class="src">销·生态出海</td></tr>
-</table>
-
-<h3 id="s4-2">费用结构</h3>
-<table>
-  <tr><th>科目</th><th>金额</th><th>同比</th><th>备注</th></tr>
-  <tr><td>研发费用（利润表）</td><td class="n">104.32 亿</td><td class="src">上年 93.04 亿</td><td class="src">口径见数据口径说明</td></tr>
-  <tr><td>研发投入表合计</td><td class="n">103.78 亿</td><td class="src">-1.05%</td><td class="src">含资本化 45.06 亿</td></tr>
-  <tr><td>销售费用</td><td class="n">112.73 亿</td><td class="src"><span class="up">+43.93%</span></td><td class="src">费用率 5.06%（上年 3.87%）</td></tr>
-</table>
-
-<h3 id="s4-3">资产负债主要变动</h3>
-<table>
-  <tr><th>科目</th><th>期末</th><th>同比</th><th>年报说明</th></tr>
-  <tr><td>资产总计</td><td class="n">2,252.88 亿</td><td class="src">+3.5%</td><td class="q">流动 1,376.5 亿 · 非流动 876.4 亿</td></tr>
-  <tr><td>负债合计</td><td class="n">1,373.96 亿</td><td class="src">-1.0%</td><td class="q">资产负债率 61.0%（上年 63.7%）</td></tr>
-  <tr><td>归母股东权益</td><td class="n">878.92 亿</td><td class="src">+11.3%</td><td class="q"></td></tr>
-  <tr><td>交易性金融资产</td><td class="n">349.66 亿</td><td class="src"><span class="up">+146.56%</span></td><td class="q">购买理财产品增加所致</td></tr>
-  <tr><td>应收款项融资</td><td class="n">238.48 亿</td><td class="src"><span class="dn">-41.98%</span></td><td class="q">直营模式现汇收款增加，以及票据背书增加所致</td></tr>
-  <tr><td>在建工程</td><td class="n">57.60 亿</td><td class="src"><span class="up">+43.67%</span></td><td class="q">报告期内新建生产线所致</td></tr>
-  <tr><td>应付票据+应付账款</td><td class="n">796.47 亿</td><td class="src">基本持平</td><td class="q">对上游供应商的占款，是经营现金流的重要来源</td></tr>
-  <tr><td>长期借款</td><td class="n">10.69 亿</td><td class="src"><span class="dn">-83.63%</span></td><td class="q">报告期偿还银行长期借款所致</td></tr>
-</table>
-
-<h3 id="s4-4">现金流量</h3>
-<table>
-  <tr><th>活动</th><th>净额</th><th>说明</th></tr>
-  <tr><td>经营</td><td class="n" style="color:var(--up)">+403.55 亿</td><td class="q">销售商品收现 2,458.55 亿，收现比 110%</td></tr>
-  <tr><td>投资</td><td class="n" style="color:var(--dn)">-291.54 亿</td><td class="q">大额进出主要为理财产品滚动；购建长期资产 115.1 亿</td></tr>
-  <tr><td>筹资</td><td class="n" style="color:var(--dn)">-134.45 亿</td><td class="q">偿还借款 194.5 亿 · 分红付息 43.8 亿</td></tr>
-  <tr><td>现金净减少</td><td class="n">-19.53 亿</td><td class="q">年末现金及等价物 252.81 亿（上年 272.33 亿）</td></tr>
-</table>
-
-<h2 id="s5">数据口径说明</h2>
-
-<table>
-  <tr><th>事项</th><th>口径 A</th><th>口径 B</th><th>差别来源</th></tr>
-  <tr><td>研发投入</td><td class="n">103.78 亿<span class="src">（研发投入表合计）</span></td><td class="n">104.32 亿<span class="src">（利润表研发费用）</span></td><td class="q">前者为当期新增投入（含资本化 45.06 亿、资本化比重 43.41%）；后者另含以前年度资本化项目的当期摊销</td></tr>
-  <tr><td>研发资本化</td><td class="n">当期资本化 45.06 亿<span class="src">（占研发投入 43.41%）</span></td><td class="n">期末资本化余额 122.12 亿</td><td class="q">前者为当期流量，后者为累计存量；德勤将「开发支出资本化」列为 2025 年度审计唯一关键审计事项</td></tr>
-  <tr><td>海外收入</td><td class="n">914.88 亿<span class="src">（主营业务分地区）</span></td><td class="n">占主营 41.6%</td><td class="q">不含零配件等其他业务；整车出口均价高于国内（坦克、皮卡为主力）</td></tr>
-  <tr><td>收现比</td><td class="n">110%</td><td class="n">= 销售商品收现 2,458.55 亿 ÷ 营业收入 2,228.24 亿</td><td class="q">收现比大于 100% 主要系预收款与税款</td></tr>
-</table>
-
-<h2 id="s6">后续跟踪事项</h2>
-
-<table>
-  <tr><th>事项</th><th>本年披露</th><th>后续验证要点</th></tr>
-  <tr><td>归元平台</td><td class="q">全球首个原生 AI 全动力平台，兼容五种动力、7 大车型品类；2026 年初推出</td><td class="q">2026 年报中搭载车型的销量与平台摊薄成本</td></tr>
-  <tr><td>直连用户渠道</td><td class="q">销售费用 +43.93%，用于直营渠道与品牌宣传；应收款项融资 -41.98% 系直营现汇收款增加</td><td class="q">2026 年报中销售费用率、毛利率与单车收入的关系</td></tr>
-  <tr><td>巴西全工艺工厂</td><td class="q">2025 年 8 月竣工投产，为拉美市场核心枢纽</td><td class="q">2026 年报中海外毛利率是否受投产爬坡拖累</td></tr>
-  <tr><td>产能扩张</td><td class="q">在建工程 +43.67%，报告期内新建生产线</td><td class="q">2026 年报中在建工程转固节奏与折旧压力</td></tr>
-  <tr><td>负债收缩</td><td class="q">长期借款 -83.63% 至 10.69 亿</td><td class="q">2026 年报中有息负债率与财务费用</td></tr>
+  <tr><th>类别</th><th>人数</th><th>占比</th></tr>
+  <tr><td>在职员工合计</td><td class="n">97,600</td><td class="src">母公司 44,464 · 主要子公司 53,136</td></tr>
+  <tr><td>生产人员</td><td class="n">47,441</td><td class="src">48.6%</td></tr>
+  <tr class="hl"><td>技术人员</td><td class="n">27,097</td><td class="src">27.8%</td></tr>
+  <tr><td>销售人员</td><td class="n">10,860</td><td class="src">11.1%</td></tr>
+  <tr><td>财务 / 行政 / 其他</td><td class="n">2,099 / 5,052 / 5,051</td><td class="src">2.1% / 5.2% / 5.2%</td></tr>
+  <tr><td>本科及以上</td><td class="n">44,137</td><td class="src">45.2%（博士 87 · 硕士 4,138 · 本科 39,912）</td></tr>
 </table>
 
 </main>
 </div>
 
 <footer class="site">
-  数据：长城汽车 2025 年年度报告（601633）合并口径 · 引文逐字摘自年报 · 每个数字经过程序核验 · 本页只描述，不评判 · 单车收入等推算值注明算法
+  数据：长城汽车 2025 年年度报告（601633）合并口径 · 每个数字经过程序核验 · 本页只描述，不评判 · 推算值注明算法
 </footer>
 
 </body>
