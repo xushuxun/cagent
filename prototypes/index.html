@@ -61,6 +61,11 @@
   .note { background:var(--panel); border-radius:6px; padding:8px 12px; margin:10px 0; color:var(--mute); font-size:12.5px; }
   .note b { color:var(--ink); font-variant-numeric:tabular-nums; }
 
+  .calc-row { display:flex; align-items:center; gap:12px; margin:10px 0; font-size:13px; }
+  .calc-row span { color:var(--mute); white-space:nowrap; }
+  .calc-row input[type=range] { flex:1; accent-color:var(--accent); }
+  .calc-row b { font-variant-numeric:tabular-nums; min-width:48px; text-align:right; }
+
   footer.site { max-width:1200px; margin:0 auto; padding:14px 32px 40px 232px; color:var(--mute); font-size:12px; border-top:1px solid var(--line); }
   @media (max-width:860px) { aside { display:none; } footer.site { padding-left:32px; }
     .chain { flex-direction:column; gap:4px; } .chain .to { transform:rotate(90deg); padding:0; }
@@ -82,6 +87,11 @@
   <a class="sub" href="#s3-1">组织架构</a>
   <a class="sub" href="#s3-3">高级管理人员</a>
   <a class="sub" href="#s3-4">员工构成</a>
+  <a href="#s4">资本回报</a>
+  <a class="sub" href="#s4-1">历年总览</a>
+  <a class="sub" href="#s4-2">资本配置</a>
+  <a class="sub" href="#s4-3">综合判断</a>
+  <a class="sub" href="#s4-4">估值试算</a>
 </aside>
 
 <main>
@@ -170,12 +180,97 @@
   <tr><td>本科及以上</td><td class="n">44,137</td><td class="src">45.2%（博士 87 · 硕士 4,138 · 本科 39,912）</td></tr>
 </table>
 
+<h2 id="s4">资本回报</h2>
+
+<div class="note">演示说明：本节数字为编造的示例数据，用于展示分析方法与版式，非长城汽车真实披露；资本成本按 10% 假设。</div>
+
+<h3 id="s4-1">历年总览</h3>
+<table class="stats">
+  <tr><th>指标（亿元）</th><th>2021</th><th>2022</th><th>2023</th><th>2024</th><th>2025</th></tr>
+  <tr class="hl"><td>归母净利润</td><td class="n">67.3</td><td class="n">82.7</td><td class="n">70.1</td><td class="n">126.6</td><td class="n">98.7</td></tr>
+  <tr><td>折旧与摊销</td><td class="n">80</td><td class="n">90</td><td class="n">95</td><td class="n">102</td><td class="n">113</td></tr>
+  <tr><td>购建长期资产付现</td><td class="n">130</td><td class="n">140</td><td class="n">150</td><td class="n">125</td><td class="n">115</td></tr>
+  <tr><td>所有者收益</td><td class="n">17.3</td><td class="n">32.7</td><td class="n">15.1</td><td class="n">103.6</td><td class="n">96.7</td></tr>
+  <tr><td>分红付现</td><td class="n">20.0</td><td class="n">25.5</td><td class="n">30.2</td><td class="n">38.5</td><td class="n">43.8</td></tr>
+  <tr><td>留存利润</td><td class="n">47.3</td><td class="n">57.2</td><td class="n">39.9</td><td class="n">88.1</td><td class="n">54.9</td></tr>
+  <tr><td>经营现金流净额</td><td class="n">353.2</td><td class="n">123.1</td><td class="n">177.2</td><td class="n">277.7</td><td class="n">403.6</td></tr>
+</table>
+
+<div class="note">五年间总股本由 92.36 亿股降至 85.58 亿股，回购注销 6.78 亿股，作为资本配置事实列示，不做每股折算。所有者收益与净利润的裂口在 2021–2023 年很大（资本开支高峰），2024 年起收敛；盈利下滑的 2023、2025 两年，分红率反而升至 43% 以上。</div>
+
+<h3 id="s4-2">资本配置</h3>
+<div class="tree">
+  <div class="tier"><div class="card top"><b>所有者收益</b>归母净利润 ＋ 折旧摊销 − 维持生意所需的资本开支</div></div>
+  <div class="conn">│</div>
+  <div class="tier">
+    <div class="card"><b>分红</b>交给股东的部分，累计 158.0 亿</div>
+    <div class="card"><b>留存</b>留在生意里的部分，累计 287.4 亿</div>
+  </div>
+  <div class="conn">│</div>
+  <div class="tier"><div class="card top"><b>留存的回报</b>累计净利润增长 31.4 亿，每 1 元留存每年赚回 0.11 元</div></div>
+</div>
+<div class="return">分红是落袋的回报，留存是继续复利的本金——复利的成色，看每 1 元留存每年赚回多少：按 10% 资本成本，及格线是 0.10 元</div>
+
+<table>
+  <tr><th>累计（2021–2025）</th><th>金额</th><th>说明</th></tr>
+  <tr><td>归母净利润</td><td class="n">445.4 亿</td><td class="src">各年合计</td></tr>
+  <tr><td>分红</td><td class="n">158.0 亿</td><td class="src">占净利润 35.5%</td></tr>
+  <tr><td>留存</td><td class="n">287.4 亿</td><td class="src">净利润减去分红</td></tr>
+  <tr><td>净利润增长</td><td class="n">31.4 亿</td><td class="src">2025 年较 2021 年</td></tr>
+</table>
+
+<div class="note">单年利润波动极大（2023、2025 年下滑，2024 年 +81%），逐年检验没有意义。累计看：留存 287.4 亿，换回每年多赚 31.4 亿，每 1 元留存每年赚回 0.11 元——刚过 10% 的资本成本及格线；若资本成本为 12%，同样的数字从及格转为毁损。这个回报能否守住，取决于生意的护城河。</div>
+
+<h3 id="s4-3">综合判断</h3>
+<table class="stats">
+  <tr><th>累计（2021–2025）</th><th>金额</th><th>含义</th></tr>
+  <tr><td>所有者收益</td><td class="n">265.4 亿</td><td class="src">五年赚到的现金，占净利润 60%</td></tr>
+  <tr class="hl"><td>留存</td><td class="n">287.4 亿</td><td class="src">留在生意里的股东资本</td></tr>
+  <tr class="hl"><td>每年多赚</td><td class="n">31.4 亿</td><td class="src">留存换来的增量利润</td></tr>
+  <tr class="hl"><td>资本回报率</td><td class="n">约 11%</td><td class="src">每年多赚 ÷ 留存</td></tr>
+</table>
+
+<div class="return">资本成本 10% —— 每 1 元留存每年赚回 0.11 元，高出及格线约 1 个百分点</div>
+
+<div class="note">五年累计所有者收益 265.4 亿，占净利润的 60%——利润有现金支撑，不是账面数字。留存 287.4 亿换回每年多赚 31.4 亿，回报率约 11%：留存在创造复利，但每 1 元留存每年只多创造约 0.01 元的价值，增长的成色平庸。这个回报能否守住，取决于护城河，而不是取决于这五年的算术。</div>
+
+<h3 id="s4-4">估值试算</h3>
+<div class="calc-row">
+  <span>资本成本</span>
+  <input type="range" id="k" min="6" max="15" step="0.5" value="10">
+  <b id="kv">10.0%</b>
+</div>
+<div class="nums">
+  <div><dt>这门生意值多少</dt><dd id="vBase">—</dd></div>
+</div>
+<div class="return" id="vVerdict"></div>
+<div class="note">这门生意值多少 ＝ 年均所有者收益 53.1 亿 ÷ 资本成本。资本成本由你定，其余数字都是这门生意已经交出的成绩：所有者收益来自前表，增量回报 10.9% 与资本成本一比，方向立判。</div>
+
 </main>
 </div>
 
 <footer class="site">
   数据：长城汽车 2025 年年度报告（601633）合并口径 · 每个数字经过程序核验 · 本页只描述，不评判 · 推算值注明算法
 </footer>
+
+<script>
+(function () {
+  var OE = 53.1, R = 31.4 / 287.4;
+  var k = document.getElementById('k');
+  function upd() {
+    var cost = parseFloat(k.value) / 100;
+    var pct = (cost * 100).toFixed(1) + '%';
+    document.getElementById('kv').textContent = pct;
+    document.getElementById('vBase').textContent = (OE / cost).toFixed(0) + ' 亿';
+    var v = document.getElementById('vVerdict');
+    if (cost < R) v.textContent = '增量回报 10.9% 高于资本成本 ' + pct + ' —— 增长在加钱，实际价值高于此数';
+    else if (cost > R) v.textContent = '资本成本 ' + pct + ' 高于增量回报 —— 增长在减钱，实际价值低于此数';
+    else v.textContent = '增量回报与资本成本同为 ' + pct + ' —— 增长不加也不减，此数即价值';
+  }
+  k.addEventListener('input', upd);
+  upd();
+})();
+</script>
 
 </body>
 </html>
