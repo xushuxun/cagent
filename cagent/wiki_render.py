@@ -137,7 +137,7 @@ def frag_s3(org: dict) -> str:
 {notes}
 <h3 id="s3-3">高级管理人员</h3>
 <table>
-  <tr><th>姓名</th><th>职务</th><th>分管</th><th>税前薪酬（万元）</th></tr>
+  <tr><th>姓名</th><th>职务</th><th>分管</th><th>报告期薪酬</th></tr>
 {exec_rows}
 </table>
 
@@ -234,7 +234,15 @@ def load_knowledge(root: Path, market: str, stock: str) -> dict:
 
     business = read(fys[-1], "business")
     if business:
-        content["business"] = {"description": business["description"]}
+        content["business"] = {"description": business["description"], "process": business.get("process") or [], "return_note": business.get("return_note", "")}
+
+    products = read(fys[-1], "products")
+    if products:
+        content["products"] = products["lines"]
+
+    org = read(fys[-1], "org")
+    if org:
+        content["org"] = org
 
     rows = [d for fy in fys if (d := read(fy, "decisions"))]
     if rows:
