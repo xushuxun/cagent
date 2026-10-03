@@ -6,14 +6,13 @@
 
 import json
 import logging
+import textwrap
 from pathlib import Path
 
 from cagent.agent import Agent, chunk_text
 from cagent.chunk import Toc, load_tocs
 
 logger = logging.getLogger(__name__)
-
-llm = Agent(trace=True)
 
 fewshots = [
     {
@@ -48,25 +47,42 @@ SCHEMA = {
 PICK_TASK = "逐年蒸馏管理层对行业大环境的判断与当年的重大经营决策。这类内容通常在年报的“管理层讨论与分析”章节，请结合目录标题选择要精读的章节（可多个）。"
 
 
-def gen_year_row(toc: Toc, chapters: list[dict]) -> dict:
+def gen_year_row(agent: Agent, toc: Toc, chapters: list[dict]) -> dict:
     current = {"judgment": [], "actions": []}
+    example = textwrap.dedent(f"""
+        <example>
+        <pages>
+        {fewshots[0]["pages"]}
+        </pages>
+        <output>
+        {json.dumps(fewshots[0]["output"], ensure_ascii=False)}
+        </output>
+        </example>
+    """).strip()
     for chapter in chapters:
         i = toc.chapters.index(chapter)
         for chunk in chunk_text(toc.chapter_text(i)):
-            current = llm.revise(
-                current,
-                chunk,
-                requirements=REQUIREMENTS,
-                example=fewshots[0],
-                schema_name="decisions",
-                schema=SCHEMA,
-            )
+            prompt = textwrap.dedent(f"""
+                {REQUIREMENTS}
+                {example}
+
+                <current>
+                {json.dumps(current, ensure_ascii=False)}
+                </current>
+
+                <pages>
+                {chunk}
+                </pages>
+            """).strip()
+            out = agent.chat_json(prompt, SCHEMA)
+            if out.pop("updated", True):
+                current = out
     if not current["judgment"] and not current["actions"]:
         raise ValueError(f"{[c['title'] for c in chapters]} 提取结果为空")
     return current
 
 
-def gen_decisions(stock: str, market: str, root: Path, force: bool, years: list[int] | None = None) -> None:
+def gen_decisions(agent: Agent, stock: str, market: str, root: Path, force: bool, years: list[int] | None = None) -> None:
     knowledge_dir = root / market / stock / "knowledge"
     for year, toc in sorted(load_tocs(root, market, stock).items()):
         if years and year not in years:
@@ -76,10 +92,10 @@ def gen_decisions(stock: str, market: str, root: Path, force: bool, years: list[
             logger.info(f"跳过（已存在）: {out_path}")
             continue
         logger.info(f"{year} …")
-        picked = llm.pick_chapters(toc.chapters, PICK_TASK)
+        picked = agent.pick_chapters(toc.chapters, PICK_TASK)
         chapters = [toc.chapters[i] for i in picked]
         logger.info(f"  选中章: {[c['title'] for c in chapters]}")
-        row = gen_year_row(toc, chapters)
+        row = gen_year_row(agent, toc, chapters)
         source = {
             "chapters": [
                 {

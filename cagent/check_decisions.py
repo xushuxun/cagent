@@ -53,7 +53,7 @@ SCHEMA_MISSING = {
 
 
 def chat(prompt: str, schema: dict) -> dict:
-    return llm.chat_json(prompt, "check", schema)
+    return llm.chat_json(prompt, schema)
 
 
 def check_year(year: int, toc: Toc, distilled: dict) -> dict:

@@ -1,5 +1,6 @@
 import json
 import re
+import textwrap
 from datetime import datetime
 from pathlib import Path
 
@@ -73,12 +74,12 @@ class Agent:
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
         return content
 
-    def chat_json(self, prompt: str, schema_name: str, schema: dict) -> dict:
+    def chat_json(self, prompt: str, schema: dict) -> dict:
         """带 json_schema 约束的聊天，temperature=0，返回解析后的 dict。"""
         return json.loads(
             self.chat(
                 messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_schema", "json_schema": {"name": schema_name, "schema": schema}},
+                response_format={"type": "json_schema", "json_schema": {"name": "response", "schema": schema}},
                 temperature=0,
             )
         )
@@ -89,17 +90,18 @@ class Agent:
         不做标题关键字匹配——选章是理解任务，交给模型，每家公司每年选一次。
         """
         listing = "\n".join(f'<chapter index="{index}">\n{chapter["title"]}\n</chapter>' for index, chapter in enumerate(chapters))
-        prompt = f"""<requirements>
-{task}
-从列表里选，返回章节序号。
-</requirements>
+        prompt = textwrap.dedent(f"""
+            <requirements>
+            {task}
+            从列表里选，返回章节序号。
+            </requirements>
 
-<chapters>
-{listing}
-</chapters>"""
+            <chapters>
+            {listing}
+            </chapters>
+        """).strip()
         indexes = self.chat_json(
             prompt,
-            "chapters",
             {
                 "type": "object",
                 "properties": {"indexes": {"type": "array", "items": {"type": "integer"}}},
@@ -110,35 +112,3 @@ class Agent:
         if not picked:
             raise ValueError("模型没有返回有效章节序号")
         return picked
-
-    def revise(self, current: dict, pages: str, *, requirements: str, example: dict | None, schema_name: str, schema: dict) -> dict:
-        """逐 chunk 蒸馏累积的通用骨架：把 <pages> 里的信息按 requirements 合并进 <current>。
-
-        example 为 {"pages": 输入节选, "output": 期望输出}，可为 None（fewshot 嵌在 requirements 里）。
-        schema 必须含 updated 布尔；模型返回 updated=false 表示无新内容，返回原 current。
-        """
-        example_block = ""
-        if example:
-            example_block = f"""
-<example>
-<pages>
-{example["pages"]}
-</pages>
-<output>
-{json.dumps(example["output"], ensure_ascii=False)}
-</output>
-</example>"""
-        prompt = f"""{requirements}
-{example_block}
-
-<current>
-{json.dumps(current, ensure_ascii=False)}
-</current>
-
-<pages>
-{pages}
-</pages>"""
-        out = self.chat_json(prompt, schema_name, schema)
-        if not out.pop("updated", True):
-            return current
-        return out

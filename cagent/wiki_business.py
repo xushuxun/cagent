@@ -6,14 +6,13 @@
 
 import json
 import logging
+import textwrap
 from pathlib import Path
 
 from cagent.agent import Agent, chunk_text
 from cagent.chunk import load_tocs
 
 logger = logging.getLogger(__name__)
-
-llm = Agent(trace=True)
 
 fewshots = [
     """沐曦股份是一家 Fabless 模式的 GPU 芯片设计公司，主要从事应用于人工智能训练和推理的 GPU 产品的研发、设计和销售，并配套自研软件栈。
@@ -58,7 +57,7 @@ SCHEMA = {
 PICK_TASK = "你在通读一份上市公司年报的目录。大致了解企业商业过程，不分析财务，需要阅读哪些章节？"
 
 
-def gen_business(stock: str, market: str, root: Path, force: bool, years: list[int] | None = None) -> None:
+def gen_business(agent: Agent, stock: str, market: str, root: Path, force: bool, years: list[int] | None = None) -> None:
     tocs = load_tocs(root, market, stock)
     year = max(years) if years else max(tocs)
     toc = tocs[year]
@@ -68,19 +67,25 @@ def gen_business(stock: str, market: str, root: Path, force: bool, years: list[i
         return
 
     logger.info(f"{year} …")
-    picked = llm.pick_chapters(toc.chapters, PICK_TASK)
+    picked = agent.pick_chapters(toc.chapters, PICK_TASK)
     logger.info(f"  选中章: {[toc.chapters[i]['title'] for i in picked]}")
     state = {"description": ""}
     for i in picked:
         for chunk in chunk_text(toc.chapter_text(i)):
-            state = llm.revise(
-                state,
-                chunk,
-                requirements=REQUIREMENTS,
-                example=None,
-                schema_name="revise",
-                schema=SCHEMA,
-            )
+            prompt = textwrap.dedent(f"""
+                {REQUIREMENTS}
+
+                <current>
+                {json.dumps(state, ensure_ascii=False)}
+                </current>
+
+                <pages>
+                {chunk}
+                </pages>
+            """).strip()
+            out = agent.chat_json(prompt, SCHEMA)
+            if out.pop("updated", True):
+                state = out
     if not state["description"]:
         raise ValueError(f"fy{year} 生意过程描述为空")
 

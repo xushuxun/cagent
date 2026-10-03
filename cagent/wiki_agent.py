@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 from cagent import wiki_business, wiki_decisions
+from cagent.agent import Agent
 
 MODULES = {
     "business": wiki_business.gen_business,
@@ -31,4 +32,5 @@ if __name__ == "__main__":
     parser.add_argument("--years", help="只跑指定年份，逗号分隔，如 2024,2025")
     args = parser.parse_args()
     years = [int(y) for y in args.years.split(",")] if args.years else None
-    MODULES[args.module](args.stock, args.market, Path(args.root), args.force, years)
+    agent = Agent(trace=True)
+    MODULES[args.module](agent, args.stock, args.market, Path(args.root), args.force, years)
