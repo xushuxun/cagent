@@ -373,6 +373,20 @@ class Toc:
         return self.text[start : end if end != -1 else len(self.text)]
 
 
+def fiscal_year(md_path: Path) -> int:
+    """年报文件发布于年份 N，覆盖财年 N-1（如 2026-03 发布 → 2025 财年）。"""
+    return int(md_path.name[:4]) - 1
+
+
+def load_tocs(root: Path, market: str, stock: str) -> dict[int, Toc]:
+    """读某公司 derived/ 下全部年报 md，返回 {财年: Toc}。"""
+    md_dir = root / market / stock / "derived"
+    mds = sorted(md_dir.glob("*.md"))
+    if not mds:
+        raise SystemExit(f"{md_dir} 没有年报 md")
+    return {fiscal_year(md): Toc(md) for md in mds}
+
+
 def build_toc(md_path: Path) -> None:
     """跑 TOC 管线，把对齐结果写到 md 同目录的 <stem>.toc.json。"""
     annual = md_path.read_text(encoding="utf-8")
