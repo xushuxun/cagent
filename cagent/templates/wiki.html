@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
 <style>
-  :root { --ink:#1f2328; --mute:#656d76; --line:#e5e7eb; --bg:#fff; --panel:#f6f8fa; --accent:#0969da; --up:#1a7f37; --dn:#cf222e; }
+  :root { --ink:#1f2328; --mute:#656d76; --line:#e5e7eb; --bg:#fff; --accent:#0969da; }
   * { margin:0; box-sizing:border-box; }
   body { background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif; font-size:14px; line-height:1.65; }
 
@@ -18,58 +18,24 @@
   aside .nav-title { font-size:11px; color:var(--mute); letter-spacing:.08em; margin-bottom:8px; }
   aside a { display:block; color:var(--mute); text-decoration:none; font-size:13px; padding:3px 0 3px 10px; border-left:2px solid transparent; }
   aside a:hover { color:var(--ink); }
-  aside a.sub { padding-left:22px; font-size:12.5px; }
-  aside a.on, aside a:target { color:var(--accent); border-left-color:var(--accent); }
+  aside a:target { color:var(--accent); border-left-color:var(--accent); }
 
   main { flex:1; min-width:0; padding:16px 32px 60px 8px; max-width:920px; }
 
   h2 { font-size:16px; font-weight:600; margin:30px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--line); scroll-margin-top:56px; }
   h2:first-child { margin-top:8px; }
   h3 { font-size:13.5px; font-weight:600; margin:18px 0 6px; scroll-margin-top:56px; }
+  p { margin:8px 0; text-align:justify; }
+  ul, ol { margin:6px 0 10px; padding-left:24px; }
 
   table { width:100%; border-collapse:collapse; font-size:13px; margin:6px 0 10px; }
   th { text-align:left; font-weight:500; font-size:12px; color:var(--mute); border-bottom:1px solid var(--ink); padding:5px 8px 5px 0; white-space:nowrap; }
   td { border-bottom:1px solid var(--line); padding:5px 8px 5px 0; vertical-align:top; }
-  td.n { font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap; }
-  td .up { color:var(--up); font-weight:400; font-size:12px; }
-  td .dn { color:var(--dn); font-weight:400; font-size:12px; }
-  td.src, td .src { color:var(--mute); font-size:12px; white-space:nowrap; }
-  td.q { color:#2c2a26; }
-  tr.hl td { background:var(--panel); }
 
-  .stats td:first-child { color:var(--mute); font-weight:400; }
-  .stats tr.hl td:first-child { color:var(--ink); font-weight:600; }
-
-  .nums { display:flex; flex-wrap:wrap; gap:1px; background:var(--line); border:1px solid var(--line); margin:10px 0; }
-  .nums div { background:var(--paper); padding:8px 14px; min-width:140px; flex:1; }
-  .nums dt { font-size:11.5px; color:var(--mute); }
-  .nums dd { font-size:16px; font-variant-numeric:tabular-nums; font-weight:600; }
-  .nums dd small { font-size:11px; color:var(--mute); font-weight:400; margin-left:4px; }
-
-  .prose p { margin:8px 0; font-size:14px; text-align:justify; }
-  .chain { display:flex; align-items:stretch; margin:10px 0 6px; }
-  .chain .step { flex:1; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:6px 7px; font-size:11.5px; color:#2c2a26; }
-  .chain .step b { display:block; text-align:center; font-size:12.5px; color:var(--ink); margin-bottom:2px; }
-  .chain .to { flex:none; align-self:center; color:var(--mute); padding:0 2px; font-size:13px; }
-  .return { border:1px dashed var(--line); border-radius:6px; padding:5px 10px; margin:0 0 8px; font-size:12px; color:var(--mute); text-align:center; }
-  .tree { margin:10px 0; }
-  .tree .tier { display:flex; gap:8px; justify-content:center; }
-  .tree .card { flex:1; max-width:290px; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:6px 10px; font-size:12px; color:#2c2a26; }
-  .tree .card b { display:block; text-align:center; font-size:12.5px; color:var(--ink); margin-bottom:2px; }
-  .tree .card.top { flex:none; min-width:340px; }
-  .tree .conn { text-align:center; color:var(--mute); font-size:12px; line-height:1.1; }
-  .note { background:var(--panel); border-radius:6px; padding:8px 12px; margin:10px 0; color:var(--mute); font-size:12.5px; }
-  .note b { color:var(--ink); font-variant-numeric:tabular-nums; }
-
-  .calc-row { display:flex; align-items:center; gap:12px; margin:10px 0; font-size:13px; }
-  .calc-row span { color:var(--mute); white-space:nowrap; }
-  .calc-row input[type=range] { flex:1; accent-color:var(--accent); }
-  .calc-row b { font-variant-numeric:tabular-nums; min-width:48px; text-align:right; }
+  .mermaid { margin:10px 0; overflow-x:auto; }
 
   footer.site { max-width:1200px; margin:0 auto; padding:14px 32px 40px 232px; color:var(--mute); font-size:12px; border-top:1px solid var(--line); }
-  @media (max-width:860px) { aside { display:none; } footer.site { padding-left:32px; }
-    .chain { flex-direction:column; gap:4px; } .chain .to { transform:rotate(90deg); padding:0; }
-    .tree .tier { flex-direction:column; align-items:center; } .tree .card, .tree .card.top { max-width:100%; width:100%; min-width:0; } }
+  @media (max-width:860px) { aside { display:none; } footer.site { padding-left:32px; } }
 </style>
 </head>
 <body>
@@ -84,15 +50,7 @@
 
 <main>
 
-<!--S1-->
-
-<!--S2-->
-
-<!--S3-->
-
-<!--S4-->
-
-<!--S5-->
+<!--SECTIONS-->
 
 </main>
 </div>
@@ -101,24 +59,19 @@
 {footer}
 </footer>
 
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>
-(function () {
-  var k = document.getElementById('k');
-  if (!k) return;
-  var OE = {oe}, R = {r};
-  function upd() {
-    var cost = parseFloat(k.value) / 100;
-    var pct = (cost * 100).toFixed(1) + '%';
-    document.getElementById('kv').textContent = pct;
-    document.getElementById('vBase').textContent = (OE / cost).toFixed(0) + ' 亿';
-    var v = document.getElementById('vVerdict');
-    if (cost < R) v.textContent = '增量回报 ' + (R * 100).toFixed(1) + '% 高于资本成本 ' + pct + ' —— 增长在加钱，实际价值高于此数';
-    else if (cost > R) v.textContent = '资本成本 ' + pct + ' 高于增量回报 —— 增长在减钱，实际价值低于此数';
-    else v.textContent = '增量回报与资本成本同为 ' + pct + ' —— 增长不加也不减，此数即价值';
-  }
-  k.addEventListener('input', upd);
-  upd();
-})();
+  (function () {
+    if (!window.mermaid) return;
+    mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
+    document.querySelectorAll('pre code.language-mermaid').forEach(function (el) {
+      var div = document.createElement('div');
+      div.className = 'mermaid';
+      div.textContent = el.textContent;
+      el.parentNode.replaceWith(div);
+    });
+    mermaid.run({ nodes: document.querySelectorAll('.mermaid') });
+  })();
 </script>
 
 </body>

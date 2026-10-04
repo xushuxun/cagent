@@ -1,7 +1,7 @@
 """decisions 模块：公司历年经营决策 writer
 
-逐年蒸馏管理层对行业大环境的判断（judgment）与当年的重大经营决策（actions），
-附章节页码定位索引，产物落位 knowledge/fy<year>/decisions.json。
+逐年蒸馏管理层对行业大环境的判断与当年的重大经营决策，
+产物落位 knowledge/fy<year>/decisions.json，各年文档在 reader 侧拼接为完整栏目。
 """
 
 import json
@@ -10,7 +10,8 @@ import textwrap
 from pathlib import Path
 
 from cagent.agent import Agent, chunk_text
-from cagent.chunk import Toc, load_tocs
+from cagent.chunk import Toc, load_tocs, script
+from cagent.kdoc import SCHEMA
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +26,10 @@ fewshots = [
 报告期内，公司依托持续高强度研发投入形成的全自研GPU芯片及软硬件生态优势，推动产品在智算中心、运营商、金融、能源等重点场景实现规模化落地。公司秉承"量产一代、在研一代、规划一代"的产品研发策略，2025年7月24日，公司于WAIC大会上发布首款基于全国产工艺的曦云C600系列，曦云C600不仅在算力上较上一代产品曦云C500有较大提升，还在精度、HBM上有新技术的应用，为复杂地缘政治背景下的供应链安全及稳定提供了保障。曦云C600于2025年末实现风险量产，并预计于2026年上半年实现量产销售。围绕"1+6+X"生态与商业布局，公司产品相继应用部署于10余个智算集群，算力网络覆盖国家人工智能公共算力平台、运营商智算平台和商业化智算中心。报告期内，公司研发投入102,739.29万元，研发投入占营业收入比例为62.49%，拥有675人的研发团队，占员工总人数的73%。""",
         "output": {
             "updated": True,
-            "judgment": ["大模型爆发带动GPU市场高速增长，2024年中国AI加速芯片市场规模同比增长98.49%。", "管理层认为出口管制与自主可控需求使国产AI芯片迎来黄金发展期，GPU与ASIC将长期共存。"],
-            "actions": ["7月24日WAIC大会发布曦云C600系列，实现全国产工艺，年末风险量产", "围绕“1+6+X”布局生态，产品部署10余个智算集群", "研发投入10.27亿元占营收62.49%，研发团队675人占员工73%"],
+            "doc": """<table>
+<tr><th>年份</th><th>管理层对行业大环境的判断</th><th>当年的重大经营决策</th></tr>
+<tr><td>2025</td><td>大模型爆发带动GPU市场高速增长，2024年中国AI加速芯片市场规模同比增长98.49%。<br>管理层认为出口管制与自主可控需求使国产AI芯片迎来黄金发展期，GPU与ASIC将长期共存。</td><td>7月24日WAIC大会发布曦云C600系列，实现全国产工艺，年末风险量产<br>围绕“1+6+X”布局生态，产品部署10余个智算集群<br>研发投入10.27亿元占营收62.49%，研发团队675人占员工73%</td></tr>
+</table>""",
         },
     },
     {
@@ -37,35 +40,30 @@ fewshots = [
 我們認為接下來一年的模型智能水平會進一步提升。編程領域將迎來L4至L5級別的智能，從「工具」走向「同事級」協作；辦公領域將複刻去年編程領域的進步速度。展望未來，在公司戰略層面，我們會從基礎模型公司向AI時代的平台型公司邁進。我們也在持續向AI原生組織演進，我們內部的Agent實習生已經覆蓋了近90%的員工。2026年1月，我們將沉澱的能力產品化，推出MiniMax Agent AI-native Workspace。""",
         "output": {
             "updated": True,
-            "judgment": ["開源大模型快速普及，人工智能邁入規模化落地與技術普惠的新階段。", "管理層預計編程領域將迎來L4至L5級別智能，應用層面臨創新窗口期。"],
-            "actions": ["四季度發佈M2、M2.1、M2-her三款語言模型，M2登頂HuggingFace熱榜", "10月發佈視頻模型Hailuo 2.3與語音模型Speech 2.6", "向AI原生組織演進，Agent實習生覆蓋近90%員工", "明確從基礎模型公司向AI平台型公司轉型的戰略方向"],
+            "doc": """<table>
+<tr><th>年份</th><th>管理層對行業大環境的判斷</th><th>當年的重大經營決策</th></tr>
+<tr><td>2025</td><td>開源大模型快速普及，人工智能邁入規模化落地與技術普惠的新階段。<br>管理層預計編程領域將迎來L4至L5級別智能，應用層面臨創新窗口期。</td><td>四季度發佈M2、M2.1、M2-her三款語言模型，M2登頂HuggingFace熱榜<br>10月發佈視頻模型Hailuo 2.3與語音模型Speech 2.6<br>向AI原生組織演進，Agent實習生覆蓋近90%員工<br>明確從基礎模型公司向AI平台型公司轉型的戰略方向</td></tr>
+</table>""",
         },
-    }
+    },
 ]
 
-REQUIREMENTS = """读 <pages>（某财年年报"管理层讨论与分析"的一部分），把管理层对行业大环境的判断和当年的重大经营决策合并进 <current>，返回合并后的完整版本。
-judgment 是 1–2 句话的列表，管理层视角，以报告期当年的回顾为锚，可并入对来年的展望（写明"预计"），不得只写展望。
-actions 是 3–10 句话的列表，每句不超过30字，记当年实际发生的事；每句必须有具体事实（谁、做了什么、对象或量级），禁止"深化""拥抱""推进"这类无新信息的表述；持续推进的长期战略只在当年有新进展时记录。
-actions 不记经营结果数字（销量、营收、利润及同比），经营结果归指标层。
+REQUIREMENTS = """读 <pages>（某财年年报"管理层讨论与分析"的一部分），把管理层对行业大环境的判断和当年的重大经营决策合并进 <current> 的文档，返回合并后的完整版本。
+判断是 1–2 句话，管理层视角，以报告期当年的回顾为锚，可并入对来年的展望（写明"预计"），不得只写展望。
+决策是 3–10 句话，每句不超过30字，记当年实际发生的事；每句必须有具体事实（谁、做了什么、对象或量级），禁止"深化""拥抱""推进"这类无新信息的表述；持续推进的长期战略只在当年有新进展时记录。
+决策不记经营结果数字（销量、营收、利润及同比），经营结果归指标层。
 时间归属必须属于本报告期：早年事项只有在本年收官、完成或终止时才记，并写明是本年的进展，不得写成当年发布。
 范围是战略、品牌矩阵调整、产能基地、投资并购、资本动作、组织变革；单一车型与零部件细节归产品模块，不在此记录。
-每个事实必须能在 <pages> 或 <current> 中找到依据，禁止编撰；没有新内容时 updated=false，judgment 和 actions 原样返回。"""
+每个事实必须能在 <pages> 或 <current> 中找到依据，禁止编撰；没有新内容时 updated=false，doc 原样返回。
+输出文档的语言（简繁体、用词）与 <pages> 保持一致。
 
-SCHEMA = {
-    "type": "object",
-    "properties": {
-        "updated": {"type": "boolean"},
-        "judgment": {"type": "array", "items": {"type": "string"}},
-        "actions": {"type": "array", "items": {"type": "string"}},
-    },
-    "required": ["updated", "judgment", "actions"],
-}
+输出一个 HTML 表格（<table>）：首行 <th> 表头三列（年份/管理层对行业大环境的判断/当年的重大经营决策，列名随原文语种），本报告期一行；判断与决策单元格内多条用 <br> 分隔。"""
 
 PICK_TASK = "逐年蒸馏管理层对行业大环境的判断与当年的重大经营决策。这类内容通常在年报的“管理层讨论与分析”章节，请结合目录标题选择要精读的章节（可多个）。"
 
 
-def gen_year_row(agent: Agent, toc: Toc, chapters: list[dict]) -> dict:
-    current = {"judgment": [], "actions": []}
+def gen_year_row(agent: Agent, year: int, toc: Toc, chapters: list[dict]) -> dict:
+    current = {"doc": ""}
     example = "\n\n".join(
         f"""<example>
 <pages>
@@ -84,6 +82,8 @@ def gen_year_row(agent: Agent, toc: Toc, chapters: list[dict]) -> dict:
                 {REQUIREMENTS}
                 {example}
 
+                本报告期是 {year} 年。原文是 {script(toc.text)}，doc 必须与原文同语种。
+
                 <current>
                 {json.dumps(current, ensure_ascii=False)}
                 </current>
@@ -93,9 +93,9 @@ def gen_year_row(agent: Agent, toc: Toc, chapters: list[dict]) -> dict:
                 </pages>
             """).strip()
             out = agent.chat_json(prompt, SCHEMA)
-            if out.pop("updated", True):
+            if out.pop("updated", True) and out.get("doc", "").strip():
                 current = out
-    if not current["judgment"] and not current["actions"]:
+    if not current["doc"].strip():
         raise ValueError(f"{[c['title'] for c in chapters]} 提取结果为空")
     return current
 
@@ -113,7 +113,7 @@ def gen_decisions(agent: Agent, stock: str, market: str, root: Path, force: bool
         picked = agent.pick_chapters(toc.chapters, PICK_TASK)
         chapters = [toc.chapters[i] for i in picked]
         logger.info(f"  选中章: {[c['title'] for c in chapters]}")
-        row = gen_year_row(agent, toc, chapters)
+        row = gen_year_row(agent, year, toc, chapters)
         source = {
             "chapters": [
                 {
@@ -125,7 +125,7 @@ def gen_decisions(agent: Agent, stock: str, market: str, root: Path, force: bool
         }
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(
-            json.dumps({"fy": year, "topic": "decisions", "source": source, **row}, ensure_ascii=False, indent=1),
+            json.dumps({"fy": year, "topic": "decisions", "source": source, "doc": row["doc"]}, ensure_ascii=False, indent=1),
             encoding="utf-8",
         )
         logger.info(f"输出: {out_path}")

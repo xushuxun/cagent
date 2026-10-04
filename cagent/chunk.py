@@ -315,38 +315,12 @@ def align_toc(agent: Agent, pages: list[str], chapters: list[dict]) -> list[dict
     return aligned
 
 
-def count_tokens(text: str) -> int:
-    """用本地模型的 /tokenize 端点计算 token 数。"""
-    return len(agent.tokenize(text))
-
-
-def crop_chapters(pages: list[str], aligned: list[dict]) -> list[dict]:
-    """按对齐后的 md 起始页裁剪每章 md 并计算 token 数。
-
-    每章覆盖 [md_page, 下一章 md_page - 1]，末章到文档结尾。
-    返回 [{"title", "page", "md_page", "md_end", "md", "tokens"}]。
-    """
-    cropped = []
-    for i, ch in enumerate(aligned):
-        start = ch["md_page"]
-        end = aligned[i + 1]["md_page"] - 1 if i + 1 < len(aligned) else len(pages)
-        md = "\n".join(pages[start - 1 : end])
-        cropped.append({**ch, "md_end": end, "md": md, "tokens": count_tokens(md)})
-    return cropped
-
-
 def load_toc(md_path: Path) -> list[dict]:
     """读 md 同目录的 <stem>.toc.json，缺失时自动重建。"""
     toc_file = md_path.with_suffix(".toc.json")
     if not toc_file.exists():
         build_toc(md_path)
     return json.loads(toc_file.read_text(encoding="utf-8"))
-
-
-def load_chapters(md_path: Path) -> list[dict]:
-    """读年报并裁剪章节，返回 [{"title", "page", "md_page", "md_end", "md", "tokens"}]。"""
-    pages = split_pages(md_path.read_text(encoding="utf-8"))
-    return crop_chapters(pages, load_toc(md_path))
 
 
 class Toc:
@@ -378,6 +352,16 @@ def fiscal_year(md_path: Path) -> int:
     return int(md_path.name[:4]) - 1
 
 
+TRAD_CHARS = "與車馬門見頁風東發現買賣長幾後會對說時實關於學經國問間開們這麼為"
+
+
+def script(text: str) -> str:
+    """采样文本判断简繁：特征繁体字占比超 3 成判为繁体。"""
+    sample = text[:2000]
+    hits = sum(sample.count(ch) for ch in TRAD_CHARS)
+    return "繁体" if hits > 2 else "简体"
+
+
 def load_tocs(root: Path, market: str, stock: str) -> dict[int, Toc]:
     """读某公司 derived/ 下全部年报 md，返回 {财年: Toc}。"""
     md_dir = root / market / stock / "derived"
@@ -403,9 +387,8 @@ def build_toc(md_path: Path) -> None:
 
     chapters = extract_toc(agent, toc_text)
     aligned = align_toc(agent, pages, chapters)
-    cropped = crop_chapters(pages, aligned)
 
-    payload = [{k: c[k] for k in ("title", "page", "md_page")} for c in cropped]
+    payload = [{k: c[k] for k in ("title", "page", "md_page")} for c in aligned]
     out = md_path.with_suffix(".toc.json")
     out.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
     logger.info(f"输出 TOC: {out} ({len(payload)} 章)")

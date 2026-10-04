@@ -13,13 +13,13 @@ import logging
 import sys
 from pathlib import Path
 
-from cagent import wiki_business, wiki_decisions, wiki_org, wiki_products
+from cagent import wiki_business, wiki_decisions, wiki_governance, wiki_products
 from cagent.agent import Agent
 
 MODULES = {
     "business": wiki_business.gen_business,
     "products": wiki_products.gen_products,
-    "org": wiki_org.gen_org,
+    "governance": wiki_governance.gen_governance,
     "decisions": wiki_decisions.gen_decisions,
 }
 
