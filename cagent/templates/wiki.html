@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
 <style>
-  :root { --ink:#1f2328; --mute:#656d76; --line:#e5e7eb; --bg:#fff; --accent:#0969da; }
+  :root { --ink:#1f2328; --mute:#656d76; --line:#e5e7eb; --bg:#fff; --panel:#f6f8fa; --accent:#0969da; }
   * { margin:0; box-sizing:border-box; }
   body { background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif; font-size:14px; line-height:1.65; }
 
@@ -18,6 +18,7 @@
   aside .nav-title { font-size:11px; color:var(--mute); letter-spacing:.08em; margin-bottom:8px; }
   aside a { display:block; color:var(--mute); text-decoration:none; font-size:13px; padding:3px 0 3px 10px; border-left:2px solid transparent; }
   aside a:hover { color:var(--ink); }
+  aside a.sub { padding-left:22px; font-size:12.5px; }
   aside a:target { color:var(--accent); border-left-color:var(--accent); }
 
   main { flex:1; min-width:0; padding:16px 32px 60px 8px; max-width:920px; }
@@ -31,11 +32,47 @@
   table { width:100%; border-collapse:collapse; font-size:13px; margin:6px 0 10px; }
   th { text-align:left; font-weight:500; font-size:12px; color:var(--mute); border-bottom:1px solid var(--ink); padding:5px 8px 5px 0; white-space:nowrap; }
   td { border-bottom:1px solid var(--line); padding:5px 8px 5px 0; vertical-align:top; }
+  td.n { font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap; }
+  td.src, td .src { color:var(--mute); font-size:12px; white-space:nowrap; }
+  td.q { color:#2c2a26; }
+  tr.hl td { background:var(--panel); }
 
-  .mermaid { margin:10px 0; overflow-x:auto; }
+  .stats td:first-child { color:var(--mute); font-weight:400; }
+  .stats tr.hl td:first-child { color:var(--ink); font-weight:600; }
+
+  .nums { display:flex; flex-wrap:wrap; gap:1px; background:var(--line); border:1px solid var(--line); margin:10px 0; }
+  .nums div { background:var(--bg); padding:8px 14px; min-width:140px; flex:1; }
+  .nums dt { font-size:11.5px; color:var(--mute); }
+  .nums dd { font-size:16px; font-variant-numeric:tabular-nums; font-weight:600; }
+  .nums dd small { font-size:11px; color:var(--mute); font-weight:400; margin-left:4px; }
+
+  .prose p { margin:8px 0; font-size:14px; text-align:justify; }
+
+  .years { display:flex; gap:10px; align-items:flex-start; margin:10px 0; }
+  .year { flex:1; min-width:0; }
+  .year > b { display:block; font-size:12.5px; color:var(--mute); font-weight:600; border-bottom:1px solid var(--ink); padding-bottom:3px; margin-bottom:2px; }
+  .year table { margin:0; font-size:12.5px; }
+  .year td { padding:3px 4px 3px 0; }
+  .year td.n, .year td.src { text-align:right; white-space:nowrap; }
+
+  .chain { display:flex; align-items:stretch; margin:10px 0 6px; }
+  .chain .step { flex:1; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:6px 7px; font-size:11.5px; color:#2c2a26; }
+  .chain .step b { display:block; text-align:center; font-size:12.5px; color:var(--ink); margin-bottom:2px; }
+  .chain .to { flex:none; align-self:center; color:var(--mute); padding:0 2px; font-size:13px; }
+  .return { border:1px dashed var(--line); border-radius:6px; padding:5px 10px; margin:0 0 8px; font-size:12px; color:var(--mute); text-align:center; }
+  .note { background:var(--panel); border-radius:6px; padding:8px 12px; margin:10px 0; color:var(--mute); font-size:12.5px; }
+  .note b { color:var(--ink); font-variant-numeric:tabular-nums; }
+
+  td.sld { width:24%; }
+  td.sld input[type=range] { width:100%; accent-color:var(--accent); }
+  td.cur.mod, td.cur.mod span { color:var(--accent); }
+  .calc-reset { font-size:11px; color:var(--mute); background:none; border:1px solid var(--line); border-radius:4px; padding:1px 8px; cursor:pointer; white-space:nowrap; }
+  .calc-reset:hover { color:var(--accent); border-color:var(--accent); }
 
   footer.site { max-width:1200px; margin:0 auto; padding:14px 32px 40px 232px; color:var(--mute); font-size:12px; border-top:1px solid var(--line); }
-  @media (max-width:860px) { aside { display:none; } footer.site { padding-left:32px; } }
+  @media (max-width:860px) { aside { display:none; } footer.site { padding-left:32px; }
+    .chain { flex-direction:column; gap:4px; } .chain .to { transform:rotate(90deg); padding:0; }
+    .years { flex-wrap:wrap; } .year { flex:1 1 40%; } }
 </style>
 </head>
 <body>
@@ -59,19 +96,45 @@
 {footer}
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>
-  (function () {
-    if (!window.mermaid) return;
-    mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
-    document.querySelectorAll('pre code.language-mermaid').forEach(function (el) {
-      var div = document.createElement('div');
-      div.className = 'mermaid';
-      div.textContent = el.textContent;
-      el.parentNode.replaceWith(div);
+document.querySelectorAll(".calc").forEach(function (calc) {
+  var inputs = {};
+  calc.querySelectorAll("input[type=range]").forEach(function (el) { inputs[el.dataset.in] = el; });
+  function text(sel, v) { calc.querySelectorAll(sel).forEach(function (el) { el.textContent = v; }); }
+  function upd() {
+    var e = parseFloat(inputs.e.value), g = parseFloat(inputs.g.value),
+        r = parseFloat(inputs.r.value), k = parseFloat(inputs.k.value);
+    text("[data-e]", e.toFixed(1));
+    text("[data-g]", g.toFixed(1));
+    text("[data-r]", r.toFixed(1));
+    text("[data-k]", k.toFixed(1));
+    calc.querySelectorAll("td.cur").forEach(function (td) {
+      td.classList.toggle("mod", parseFloat(inputs[td.dataset.for].value) !== parseFloat(inputs[td.dataset.for].dataset.def));
     });
-    mermaid.run({ nodes: document.querySelectorAll('.mermaid') });
-  })();
+    var bad = null;
+    if (g !== 0 && r <= 0) bad = "留存回报为零，增长无从谈起";
+    var b = g === 0 ? 0 : g / r;
+    if (b > 1) bad = "增长超出留存回报的支撑";
+    if (k - g <= 0.5) bad = "增长不低于资本成本，模型不适用";
+    if (bad) {
+      text("[data-b]", "—"); text("[data-d]", "—"); text("[data-pv]", "—");
+      text("[data-v]", "—（" + bad + "）");
+    } else {
+      var d = e * (1 - b), pv = Math.round(d / ((k - g) / 100));
+      text("[data-b]", (b * 100).toFixed(0));
+      text("[data-d]", d.toFixed(1));
+      text("[data-pv]", String(pv));
+      text("[data-v]", "约 " + pv + " 亿");
+    }
+    text("[data-cmp]", r > k ? "留存回报更高，增长加分" : r < k ? "资本成本更高，增长减分" : "两者相等，增长不影响");
+  }
+  Object.keys(inputs).forEach(function (key) { inputs[key].addEventListener("input", upd); });
+  calc.querySelector(".calc-reset").addEventListener("click", function () {
+    Object.keys(inputs).forEach(function (key) { inputs[key].value = inputs[key].dataset.def; });
+    upd();
+  });
+  upd();
+});
 </script>
 
 </body>

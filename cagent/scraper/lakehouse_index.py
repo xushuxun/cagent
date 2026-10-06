@@ -60,11 +60,7 @@ def cleanup_orphans(company_dir: Path, expected_filenames: set[str], kind: str) 
     filings = [r for r in index.get("filings", []) if isinstance(r, dict)]
     kind_files = {r["file"] for r in filings if r.get("kind", "annual") == kind}
 
-    orphans = [
-        f
-        for f in company_dir.iterdir()
-        if f.is_file() and f.name in kind_files and f.name not in expected_filenames
-    ]
+    orphans = [f for f in company_dir.iterdir() if f.is_file() and f.name in kind_files and f.name not in expected_filenames]
     for f in orphans:
         log.info(f"  删除多余文件: {f.name}")
         f.unlink()

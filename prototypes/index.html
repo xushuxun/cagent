@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>长城汽车 · 2025 年年度报告摘要</title>
 <style>
-  :root { --ink:#1f2328; --mute:#656d76; --line:#e5e7eb; --bg:#fff; --panel:#f6f8fa; --accent:#0969da; --up:#1a7f37; --dn:#cf222e; }
+  :root { --ink:#1f2328; --mute:#656d76; --line:#e5e7eb; --bg:#fff; --panel:#f6f8fa; --accent:#0969da; }
   * { margin:0; box-sizing:border-box; }
   body { background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif; font-size:14px; line-height:1.65; }
 
@@ -31,45 +31,45 @@
   th { text-align:left; font-weight:500; font-size:12px; color:var(--mute); border-bottom:1px solid var(--ink); padding:5px 8px 5px 0; white-space:nowrap; }
   td { border-bottom:1px solid var(--line); padding:5px 8px 5px 0; vertical-align:top; }
   td.n { font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap; }
-  td .up { color:var(--up); font-weight:400; font-size:12px; }
-  td .dn { color:var(--dn); font-weight:400; font-size:12px; }
   td.src, td .src { color:var(--mute); font-size:12px; white-space:nowrap; }
   td.q { color:#2c2a26; }
   tr.hl td { background:var(--panel); }
 
   .stats td:first-child { color:var(--mute); font-weight:400; }
   .stats tr.hl td:first-child { color:var(--ink); font-weight:600; }
+  .stats td small { display:block; color:var(--mute); font-size:11px; font-weight:400; }
+  .stats tr.grp td { border-bottom:none; color:var(--mute); font-size:12px; padding-top:12px; }
 
   .nums { display:flex; flex-wrap:wrap; gap:1px; background:var(--line); border:1px solid var(--line); margin:10px 0; }
-  .nums div { background:var(--paper); padding:8px 14px; min-width:140px; flex:1; }
+  .nums div { background:var(--bg); padding:8px 14px; min-width:140px; flex:1; }
   .nums dt { font-size:11.5px; color:var(--mute); }
   .nums dd { font-size:16px; font-variant-numeric:tabular-nums; font-weight:600; }
   .nums dd small { font-size:11px; color:var(--mute); font-weight:400; margin-left:4px; }
 
   .prose p { margin:8px 0; font-size:14px; text-align:justify; }
+  .years { display:flex; gap:10px; align-items:flex-start; margin:10px 0; }
+  .year { flex:1; min-width:0; }
+  .year > b { display:block; font-size:12.5px; color:var(--mute); font-weight:600; border-bottom:1px solid var(--ink); padding-bottom:3px; margin-bottom:2px; }
+  .year table { margin:0; font-size:12.5px; }
+  .year td { padding:3px 4px 3px 0; }
+  .year td.n, .year td.src { text-align:right; white-space:nowrap; }
   .chain { display:flex; align-items:stretch; margin:10px 0 6px; }
   .chain .step { flex:1; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:6px 7px; font-size:11.5px; color:#2c2a26; }
   .chain .step b { display:block; text-align:center; font-size:12.5px; color:var(--ink); margin-bottom:2px; }
   .chain .to { flex:none; align-self:center; color:var(--mute); padding:0 2px; font-size:13px; }
-  .return { border:1px dashed var(--line); border-radius:6px; padding:5px 10px; margin:0 0 8px; font-size:12px; color:var(--mute); text-align:center; }
-  .tree { margin:10px 0; }
-  .tree .tier { display:flex; gap:8px; justify-content:center; }
-  .tree .card { flex:1; max-width:290px; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:6px 10px; font-size:12px; color:#2c2a26; }
-  .tree .card b { display:block; text-align:center; font-size:12.5px; color:var(--ink); margin-bottom:2px; }
-  .tree .card.top { flex:none; min-width:340px; }
-  .tree .conn { text-align:center; color:var(--mute); font-size:12px; line-height:1.1; }
   .note { background:var(--panel); border-radius:6px; padding:8px 12px; margin:10px 0; color:var(--mute); font-size:12.5px; }
   .note b { color:var(--ink); font-variant-numeric:tabular-nums; }
 
-  .calc-row { display:flex; align-items:center; gap:12px; margin:10px 0; font-size:13px; }
-  .calc-row span { color:var(--mute); white-space:nowrap; }
-  .calc-row input[type=range] { flex:1; accent-color:var(--accent); }
-  .calc-row b { font-variant-numeric:tabular-nums; min-width:48px; text-align:right; }
+  td.sld { width:24%; }
+  td.sld input[type=range] { width:100%; accent-color:var(--accent); }
+  td.cur.mod, td.cur.mod span { color:var(--accent); }
+  .calc-reset { font-size:11px; color:var(--mute); background:none; border:1px solid var(--line); border-radius:4px; padding:1px 8px; cursor:pointer; white-space:nowrap; }
+  .calc-reset:hover { color:var(--accent); border-color:var(--accent); }
 
   footer.site { max-width:1200px; margin:0 auto; padding:14px 32px 40px 232px; color:var(--mute); font-size:12px; border-top:1px solid var(--line); }
   @media (max-width:860px) { aside { display:none; } footer.site { padding-left:32px; }
     .chain { flex-direction:column; gap:4px; } .chain .to { transform:rotate(90deg); padding:0; }
-    .tree .tier { flex-direction:column; align-items:center; } .tree .card, .tree .card.top { max-width:100%; width:100%; min-width:0; } }
+    .years { flex-wrap:wrap; } .year { flex:1 1 40%; } }
 </style>
 </head>
 <body>
@@ -79,29 +79,28 @@
 <div class="layout">
 <aside>
   <div class="nav-title">目录</div>
-  <a href="#s1">生意过程简介</a>
+  <a href="#s1">生意模式</a>
   <a class="sub" href="#s1-1">业务说明</a>
   <a class="sub" href="#s1-2">经营过程</a>
-  <a href="#s2">主要产品</a>
-  <a href="#s3">公司人事组织架构</a>
-  <a class="sub" href="#s3-1">组织架构</a>
-  <a class="sub" href="#s3-3">高级管理人员</a>
-  <a class="sub" href="#s3-4">员工构成</a>
+  <a href="#s2">产品与销量</a>
+  <a href="#s3">治理与激励</a>
+  <a class="sub" href="#s3-1">控制权与利益绑定</a>
+  <a class="sub" href="#s3-2">薪酬与激励</a>
+  <a class="sub" href="#s3-3">分红与股东回报</a>
+  <a class="sub" href="#s3-4">关联体系</a>
   <a href="#s4">公司历年经营决策</a>
   <a href="#s5">资本回报</a>
-  <a class="sub" href="#s5-1">历年总览</a>
-  <a class="sub" href="#s5-2">资本配置</a>
-  <a class="sub" href="#s5-3">综合判断</a>
-  <a class="sub" href="#s5-4">估值试算</a>
+  <a class="sub" href="#s5-1">资本分析</a>
+  <a class="sub" href="#s5-2">假设试算</a>
 </aside>
 
 <main>
 
-<h2 id="s1">生意过程简介</h2>
+<h2 id="s1">生意模式</h2>
 
 <h3 id="s1-1">业务说明</h3>
 <div class="prose">
-<p>长城汽车是一家全球化智能科技公司，业务涵盖汽车及零部件的设计、研发、生产、销售和服务。公司坚持“ONE GWM”品牌战略，拥有哈弗、坦克、魏牌、欧拉、长城皮卡、长城灵魂及商用车等品牌，产品覆盖 SUV、皮卡、轿车、MPV 及摩托车、重卡等品类，动力涵盖汽油、柴油、纯电、混动、插混及氢能。</p>
+<p>长城汽车是一家全球化智能科技公司，业务涵盖汽车及零部件的设计、研发、生产、销售和服务。公司坚持「ONE GWM」品牌战略，拥有哈弗、坦克、魏牌、欧拉、长城皮卡、长城灵魂及商用车等品牌，产品覆盖 SUV、皮卡、轿车、MPV 及摩托车、重卡等品类，动力涵盖汽油、柴油、纯电、混动、插混及氢能。</p>
 <p>公司的研发模式为自主研发，聚焦核心技术，构建起以 Hi4 电混、柠檬混动、坦克平台、归元平台及 VLA 智能驾驶大模型为核心的技术体系。公司实现了核心零部件的垂直整合，并通过收购无锡芯动半导体股权加强芯片布局。采购方面，公司向上游供应商采购原材料、零部件及模具，对主要供应商保持分散采购。生产模式为自主制造，公司在国内及泰国、巴西等地拥有全工艺整车生产基地，在厄瓜多尔、马来西亚等地拥有 KD 工厂，实现产能在地化。销售模式以经销为主，辅以加速构建的直连用户新渠道，通过 1,500 多家海外销售渠道及国内经销商网络覆盖市场。交付环节，公司通过经销商向终端用户交付整车，并提供售后服务。</p>
 <p>公司的客户主要为全球各地的终端消费者及经销商，国内及海外收入占比相当，海外销售覆盖 170 多个国家和地区。公司不依赖于少数重要客户，前五大客户销售额占比不足 7%。</p>
 <p>资金流方面，公司的资金来源为整车及零部件销售回款、银行借款及汇兑收益；资金流出主要为向上游支付的原材料及零部件采购款、研发人员薪酬、工厂建设资本开支及销售宣传费用。公司通过经营性现金流及银行借款满足日常经营。</p>
@@ -123,144 +122,170 @@
 </div>
 <div class="return">↩ 资金回流：回款覆盖采购、薪酬、资本开支与宣传费用，结余沉淀为现金及理财，支持下一轮研发与产能投入</div>
 
-<h2 id="s2">主要产品</h2>
-<table>
-  <tr><th>品牌</th><th>销量</th><th>同比</th><th>定位</th></tr>
-  <tr><td>哈弗</td><td class="n">76.15 万辆</td><td class="src">+7.69%</td><td class="q">「全球 SUV 专家」，全球累计用户破 1,000 万</td></tr>
-  <tr><td>坦克</td><td class="n">23.44 万辆</td><td class="src">—</td><td class="q">「铁汉柔情」智能豪华越野 SUV，累计超 83 万辆</td></tr>
-  <tr><td>长城皮卡</td><td class="n">17.89 万辆</td><td class="src">—</td><td class="q">连续 28 年皮卡销量冠军，全球累计超 285 万辆</td></tr>
-  <tr><td>欧拉</td><td class="n">4.83 万辆</td><td class="src">—</td><td class="q">从「精致女性」升级为「全球年轻的都市生活家」</td></tr>
-  <tr><td>魏牌</td><td class="src">未单列</td><td class="src">—</td><td class="q">新能源高端 MPV「高山」，7-12 月全国 MPV 销量冠军</td></tr>
-  <tr><td>灵魂·重卡</td><td class="src">未单列</td><td class="src">—</td><td class="q">水平对置 8 缸豪华摩托；Hi4-G 混动重卡</td></tr>
-  <tr><td>其中新能源</td><td class="n">40.60 万辆</td><td class="src">+26.00%</td><td class="q">占总销量 30.7%</td></tr>
-</table>
+<h2 id="s2">产品与销量</h2>
 
-<h2 id="s3">公司人事组织架构</h2>
-
-<h3 id="s3-1">组织架构</h3>
-<div class="tree">
-  <div class="tier"><div class="card top"><b>董事会 · 8 人</b>执行董事 3 · 职工董事 1 · 非执行董事 1 · 独立非执行董事 3</div></div>
-  <div class="conn">│</div>
-  <div class="tier">
-    <div class="card"><b>审计委员会</b>3 独董 + 1 非执行；审阅年报与内控，行使原监事会职权</div>
-    <div class="card"><b>薪酬委员会</b>1 执行 + 2 独董；董事及高管薪酬政策与待遇</div>
-    <div class="card"><b>提名委员会</b>1 执行 + 2 独董；董事会构成与选人标准</div>
-    <div class="card"><b>战略及可持续发展委员会</b>2 执行 + 1 非执行 + 2 独董；战略方向与可持续发展事务</div>
+<div class="years">
+  <div class="year">
+    <b>2021</b>
+    <table>
+      <tr><td>哈弗</td><td class="n">77.0</td></tr>
+      <tr><td>坦克</td><td class="n">8.5</td></tr>
+      <tr><td>长城皮卡</td><td class="n">23.3</td></tr>
+      <tr><td>欧拉</td><td class="n">13.5</td></tr>
+    </table>
   </div>
-  <div class="conn">│</div>
-  <div class="tier"><div class="card top"><b>经营层</b>总经理穆峰负责整体管理；副总经理赵国庆主管运营及配套采购；财务总监李红栓兼任董事会秘书</div></div>
-  <div class="conn">│</div>
-  <div class="tier">
-    <div class="card"><b>品牌公司矩阵</b>GWM 母品牌引领：哈弗、坦克、魏牌、欧拉、长城皮卡、灵魂、商用车；以用户为中心的组织变革，全面 To C</div>
-    <div class="card"><b>职能条线</b>研发、采购、生产、销售、服务全链路，研产供销服按生态出海布局</div>
-    <div class="card"><b>体外生态企业</b>蜂巢能源（电池）、毫末智行（智能驾驶）、光束汽车（与宝马合资）、极电光能</div>
+  <div class="year">
+    <b>2022</b>
+    <table>
+      <tr><td>哈弗</td><td class="n">61.7</td></tr>
+      <tr><td>坦克</td><td class="n">12.4</td></tr>
+      <tr><td>长城皮卡</td><td class="n">18.7</td></tr>
+      <tr><td>欧拉</td><td class="n">10.4</td></tr>
+    </table>
+  </div>
+  <div class="year">
+    <b>2023</b>
+    <table>
+      <tr><td>哈弗</td><td class="n">71.5</td></tr>
+      <tr><td>坦克</td><td class="n">16.3</td></tr>
+      <tr><td>长城皮卡</td><td class="n">20.2</td></tr>
+      <tr><td>欧拉</td><td class="n">10.9</td></tr>
+    </table>
+  </div>
+  <div class="year">
+    <b>2024</b>
+    <table>
+      <tr><td>哈弗</td><td class="n">70.7</td></tr>
+      <tr><td>坦克</td><td class="n">23.1</td></tr>
+      <tr><td>长城皮卡</td><td class="n">17.7</td></tr>
+      <tr><td>欧拉</td><td class="n">6.3</td></tr>
+    </table>
+  </div>
+  <div class="year">
+    <b>2025</b>
+    <table>
+      <tr><td>哈弗</td><td class="n">76.15</td></tr>
+      <tr><td>坦克</td><td class="n">23.44</td></tr>
+      <tr><td>长城皮卡</td><td class="n">17.89</td></tr>
+      <tr><td>欧拉</td><td class="n">4.83</td></tr>
+      <tr><td>魏牌</td><td class="src">未单列</td></tr>
+      <tr><td>灵魂·重卡</td><td class="src">未单列</td></tr>
+      <tr class="hl"><td>新能源合计</td><td class="n">40.60</td></tr>
+    </table>
   </div>
 </div>
 
-<div class="note">2025 年公司不再设置监事会，《公司法》规定的监事会职权由董事会审计委员会行使。董事长魏建军 1990 年加入公司，管理层均为内部提拔。</div>
+<div class="note">单位：万辆。</div>
 
-<h3 id="s3-3">高级管理人员</h3>
+<h2 id="s3">治理与激励</h2>
+
+<h3 id="s3-1">控制权与利益绑定</h3>
 <table>
-  <tr><th>姓名</th><th>职务</th><th>分管</th><th>税前薪酬（万元）</th></tr>
-  <tr><td>魏建军</td><td>董事长、执行董事</td><td class="q">集团整体战略规划及业务发展；1990 年加入，2001 年 6 月至今任董事长；兼任控股股东创新长城资管董事长、总经理</td><td class="n">566.18</td></tr>
-  <tr><td>穆峰</td><td>总经理</td><td class="q">整体管理；2007 年加入，历任研发负责人、商品战略负责人、整车业务负责人，2022 年 7 月至今任总经理</td><td class="n">646.08</td></tr>
-  <tr><td>赵国庆</td><td>副董事长、执行董事、副总经理</td><td class="q">运营及配套采购；2000 年加入，2010 年 6 月至今任副总经理；兼任光束汽车董事长</td><td class="n">381.36</td></tr>
-  <tr><td>李红栓</td><td>执行董事、财务总监、董事会秘书及公司秘书</td><td class="q">财务与资本运作；注册会计师，2007 年加入，从事财务管理 19 年，2020 年 6 月至今任财务总监</td><td class="n">231.35</td></tr>
+  <tr><th>问题</th><th>事实</th><th>含义</th></tr>
+  <tr><td>谁控制公司</td><td class="q">控股股东为创新长城资管，魏建军兼任其董事长、总经理，并任上市公司董事长</td><td class="q">控制权与经营权集中于创始人</td></tr>
+  <tr><td>管理层从哪来</td><td class="q">魏建军 1990 年加入、2001 年起任董事长；穆峰、赵国庆、李红栓均为 2000/2007 年加入的内部提拔</td><td class="q">核心管理层均为内部提拔</td></tr>
+  <tr><td>决策是否制衡</td><td class="q">董事会 8 人含 3 名独董；2025 年起不设监事会，职权由审计委员会行使</td><td class="q">新《公司法》框架下的安排</td></tr>
 </table>
 
-<div class="note">董事会其余成员：职工董事卢彩娟（2025 年 8 月由监事会主席转任）、非执行董事何平、独立非执行董事范辉（财务背景）、乐英（高校机械专业）、邹兆麟（香港律师、公司治理）。本届任期至 2026 年 6 月。</div>
-
-<h3 id="s3-4">员工构成</h3>
+<h3 id="s3-2">薪酬与激励</h3>
 <table>
-  <tr><th>类别</th><th>人数</th><th>占比</th></tr>
-  <tr><td>在职员工合计</td><td class="n">97,600</td><td class="src">母公司 44,464 · 主要子公司 53,136</td></tr>
-  <tr><td>生产人员</td><td class="n">47,441</td><td class="src">48.6%</td></tr>
-  <tr class="hl"><td>技术人员</td><td class="n">27,097</td><td class="src">27.8%</td></tr>
-  <tr><td>销售人员</td><td class="n">10,860</td><td class="src">11.1%</td></tr>
-  <tr><td>财务 / 行政 / 其他</td><td class="n">2,099 / 5,052 / 5,051</td><td class="src">2.1% / 5.2% / 5.2%</td></tr>
-  <tr><td>本科及以上</td><td class="n">44,137</td><td class="src">45.2%（博士 87 · 硕士 4,138 · 本科 39,912）</td></tr>
+  <tr><th>姓名</th><th>职务</th><th>税前薪酬（万元）</th><th>说明</th></tr>
+  <tr><td>穆峰</td><td>总经理</td><td class="n">646.08</td><td class="q">—</td></tr>
+  <tr><td>魏建军</td><td>董事长、执行董事</td><td class="n">566.18</td><td class="q">—</td></tr>
+  <tr><td>赵国庆</td><td>副董事长、执行董事、副总经理</td><td class="n">381.36</td><td class="q">—</td></tr>
+  <tr><td>李红栓</td><td>执行董事、财务总监、董秘</td><td class="n">231.35</td><td class="q">—</td></tr>
 </table>
+
+<h3 id="s3-3">分红与股东回报</h3>
+<div class="note">2025 年分红率 43%，五年回购注销 6.78 亿股（总股本 92.36 → 85.58 亿股）；2023、2025 两个利润下滑年份，分红率均高于 43%。</div>
+
+<h3 id="s3-4">关联体系</h3>
+<table>
+  <tr><th>体外资产</th><th>关系</th><th>风险点</th></tr>
+  <tr><td>蜂巢能源（电池）</td><td class="q">体外生态企业</td><td class="q">核心零部件在体外，采购定价是否公允需跟踪</td></tr>
+  <tr><td>毫末智行（智能驾驶）</td><td class="q">体外生态企业</td><td class="q">核心技术投入在体外，存在利益分流可能</td></tr>
+  <tr><td>光束汽车</td><td class="q">与宝马合资，副总经理赵国庆兼任董事长</td><td class="q">高管精力分配与少数股东结构</td></tr>
+  <tr><td>极电光能</td><td class="q">体外生态企业</td><td class="q">—</td></tr>
+</table>
+
+<div class="note">电池、智驾资产在体外，不并表；与上市公司的交易见关联交易披露。</div>
 
 <h2 id="s4">公司历年经营决策</h2>
-
-<div class="note">演示说明：本节内容为编造的示例数据，用于展示分析方法与版式，非长城汽车真实披露。</div>
 
 <table class="stats">
   <tr><th>年份</th><th>管理层对行业大环境的判断</th><th>当年的重大经营决策</th></tr>
   <tr><td class="n">2021</td><td class="q">芯片短缺压制全年产量，碳酸锂等原材料涨价压缩利润；新能源渗透率突破 15%，拐点已现</td><td>发布 2025 战略，新能源投入翻倍；坦克品牌独立运营；蜂巢能源启动扩产</td></tr>
   <tr><td class="n">2022</td><td class="q">供应链压力缓解，需求走弱，竞争转入存量争夺；新能源渗透率接近 30%</td><td>哈弗启动新能源转型；海外 KD 组装厂增至四座；销售网络开始直营试点</td></tr>
-  <tr><td class="n">2023</td><td class="q">价格战成为常态，10—20 万元价格带失血最重；出海是唯一的结构性增量</td><td>明确"不降价、守住高价值市场"的经营方针；坦克 Hi4-T 上市；关停两座燃油车老产线</td></tr>
+  <tr><td class="n">2023</td><td class="q">价格战成为常态，10—20 万元价格带失血最重；出海是唯一的结构性增量</td><td>明确「不降价、守住高价值市场」的经营方针；坦克 Hi4-T 上市；关停两座燃油车老产线</td></tr>
   <tr><td class="n">2024</td><td class="q">新能源渗透率过半，燃油车基本盘加速萎缩；海外市场从整车出口转向本地化生产</td><td>直营体系铺开至 500 家；俄罗斯工厂扩产，巴西工厂动工；资本开支见顶回落</td></tr>
   <tr><td class="n">2025</td><td class="q">海外本地化进入收获期，贸易政策与汇率的不确定性上升；国内竞争烈度不减</td><td>发布归元平台，五条动力路线并入同一技术母体；资本开支降至五年最低；分红率提高到 43%</td></tr>
 </table>
 
-<div class="note">判断写在年报的管理层讨论里，决策记在报表的科目里——下一栏资本回报，是这五年决策的成绩单。</div>
+<div class="note">判断摘自年报管理层讨论与分析，决策对应报表科目。</div>
 
 <h2 id="s5">资本回报</h2>
 
-<div class="note">演示说明：本节数字为编造的示例数据，用于展示分析方法与版式，非长城汽车真实披露；资本成本按 10% 假设。</div>
+<div class="note">本节货币单位为人民币亿元。</div>
 
-<h3 id="s5-1">历年总览</h3>
+<h3 id="s5-1">资本分析</h3>
+<div class="note">巴菲特看一门生意的顺序：这门生意占用多少资本、赚多少回报；多出来的钱去了哪里。回报是否可持续不在本节回答，见生意模式一节。</div>
+
 <table class="stats">
-  <tr><th>指标（亿元）</th><th>2021</th><th>2022</th><th>2023</th><th>2024</th><th>2025</th></tr>
-  <tr class="hl"><td>归母净利润</td><td class="n">67.3</td><td class="n">82.7</td><td class="n">70.1</td><td class="n">126.6</td><td class="n">98.7</td></tr>
-  <tr><td>折旧与摊销</td><td class="n">80</td><td class="n">90</td><td class="n">95</td><td class="n">102</td><td class="n">113</td></tr>
-  <tr><td>购建长期资产付现</td><td class="n">130</td><td class="n">140</td><td class="n">150</td><td class="n">125</td><td class="n">115</td></tr>
-  <tr><td>所有者收益</td><td class="n">17.3</td><td class="n">32.7</td><td class="n">15.1</td><td class="n">103.6</td><td class="n">96.7</td></tr>
-  <tr><td>分红付现</td><td class="n">20.0</td><td class="n">25.5</td><td class="n">30.2</td><td class="n">38.5</td><td class="n">43.8</td></tr>
-  <tr><td>留存利润</td><td class="n">47.3</td><td class="n">57.2</td><td class="n">39.9</td><td class="n">88.1</td><td class="n">54.9</td></tr>
-  <tr><td>经营现金流净额</td><td class="n">353.2</td><td class="n">123.1</td><td class="n">177.2</td><td class="n">277.7</td><td class="n">403.6</td></tr>
+  <tr><th>指标（亿元）</th><th>2021</th><th>2022</th><th>2023</th><th>2024</th><th>2025</th><th>五年累计</th></tr>
+  <tr class="grp"><td colspan="7">生意与资本</td></tr>
+  <tr class="hl"><td>归母净利润<small>合并利润表「归属于母公司股东的净利润」</small></td><td class="n">67.26</td><td class="n">82.66</td><td class="n">70.22</td><td class="n">126.60</td><td class="n">98.65</td><td class="n">445.39</td></tr>
+  <tr><td>净利率<small>＝归母净利润 ÷ 营业总收入</small></td><td class="n">4.9%</td><td class="n">6.0%</td><td class="n">4.1%</td><td class="n">6.3%</td><td class="n">4.4%</td><td class="n">5.1%</td></tr>
+  <tr><td>经营性长期资产<small>＝固定资产＋在建工程＋无形资产＋开发支出</small></td><td class="n">461.44</td><td class="n">554.33</td><td class="n">600.87</td><td class="n">589.62</td><td class="n">594.89</td><td class="n">—</td></tr>
+  <tr><td>营运资本<small>＝存货＋应收票据＋应收账款−应付票据−应付账款−合同负债；负值即生意由上下游资金运转</small></td><td class="n">−487.10</td><td class="n">−353.98</td><td class="n">−412.97</td><td class="n">−562.85</td><td class="n">−554.03</td><td class="n">—</td></tr>
+  <tr><td>有息负债<small>＝短期借款＋长期借款＋应付债券</small></td><td class="n">173.36</td><td class="n">248.60</td><td class="n">224.50</td><td class="n">168.86</td><td class="n">112.91</td><td class="n">—</td></tr>
+  <tr><td>货币资金及交易性金融资产<small>合并资产负债表</small></td><td class="n">390.94</td><td class="n">378.27</td><td class="n">424.49</td><td class="n">449.50</td><td class="n">638.12</td><td class="n">—</td></tr>
+  <tr class="grp"><td colspan="7">多出来的钱去了哪里</td></tr>
+  <tr><td>现金分红<small>当年度利润分配方案，含税，次年支付</small></td><td class="n">34.18</td><td class="n">25.34</td><td class="n">25.63</td><td class="n">38.53</td><td class="n">29.95</td><td class="n">153.63</td></tr>
+  <tr><td>分红比例<small>＝现金分红 ÷ 归母净利润</small></td><td class="n">50.8%</td><td class="n">30.7%</td><td class="n">36.5%</td><td class="n">30.4%</td><td class="n">30.4%</td><td class="n">34.5%</td></tr>
+  <tr><td>回购注销（亿股）<small>股本变动表；2022 年 62.6 亿港元、2023 年 22.0 亿港元</small></td><td class="n">0.02</td><td class="n">5.88</td><td class="n">2.77</td><td class="n">0.04</td><td class="n">0.04</td><td class="n">8.66</td></tr>
+  <tr><td>总股本（亿股）<small>期末；回购注销使其五年净减 6.78 亿股</small></td><td class="n">92.36</td><td class="n">87.65</td><td class="n">84.98</td><td class="n">85.56</td><td class="n">85.58</td><td class="n">—</td></tr>
+  <tr class="grp"><td colspan="7">留存与回报</td></tr>
+  <tr><td>留存<small>＝归母净利润 − 现金分红</small></td><td class="n">33.08</td><td class="n">57.32</td><td class="n">44.59</td><td class="n">88.07</td><td class="n">68.70</td><td class="n">291.76</td></tr>
+  <tr class="hl"><td>留存回报率（五年）<small>＝净利增量 ÷ 累计留存；芒格：长期持有回报收敛于公司的资本回报率</small></td><td class="n" colspan="5">2021 → 2025 归母净利润 67.26 → 98.65</td><td class="n">10.8%</td></tr>
 </table>
 
-<div class="note">五年间总股本由 92.36 亿股降至 85.58 亿股，回购注销 6.78 亿股，作为资本配置事实列示，不做每股折算。所有者收益与净利润的裂口在 2021–2023 年很大（资本开支高峰），2024 年起收敛；盈利下滑的 2023、2025 两年，分红率反而升至 43% 以上。</div>
-
-<h3 id="s5-2">资本配置</h3>
-<div class="tree">
-  <div class="tier"><div class="card top"><b>所有者收益</b>归母净利润 ＋ 折旧摊销 − 维持生意所需的资本开支</div></div>
-  <div class="conn">│</div>
-  <div class="tier">
-    <div class="card"><b>分红</b>交给股东的部分，累计 158.0 亿</div>
-    <div class="card"><b>留存</b>留在生意里的部分，累计 287.4 亿</div>
-  </div>
-  <div class="conn">│</div>
-  <div class="tier"><div class="card top"><b>留存的回报</b>累计净利润增长 31.4 亿，每 1 元留存每年赚回 0.11 元</div></div>
-</div>
-<div class="return">分红是落袋的回报，留存是继续复利的本金——复利的成色，看每 1 元留存每年赚回多少：按 10% 资本成本，及格线是 0.10 元</div>
-
-<table>
-  <tr><th>累计（2021–2025）</th><th>金额</th><th>说明</th></tr>
-  <tr><td>归母净利润</td><td class="n">445.4 亿</td><td class="src">各年合计</td></tr>
-  <tr><td>分红</td><td class="n">158.0 亿</td><td class="src">占净利润 35.5%</td></tr>
-  <tr><td>留存</td><td class="n">287.4 亿</td><td class="src">净利润减去分红</td></tr>
-  <tr><td>净利润增长</td><td class="n">31.4 亿</td><td class="src">2025 年较 2021 年</td></tr>
-</table>
-
-<div class="note">单年利润波动极大（2023、2025 年下滑，2024 年 +81%），逐年检验没有意义。累计看：留存 287.4 亿，换回每年多赚 31.4 亿，每 1 元留存每年赚回 0.11 元——刚过 10% 的资本成本及格线；若资本成本为 12%，同样的数字从及格转为毁损。这个回报能否守住，取决于生意的护城河。</div>
-
-<h3 id="s5-3">综合判断</h3>
-<table class="stats">
-  <tr><th>累计（2021–2025）</th><th>金额</th><th>含义</th></tr>
-  <tr><td>所有者收益</td><td class="n">265.4 亿</td><td class="src">五年赚到的现金，占净利润 60%</td></tr>
-  <tr class="hl"><td>留存</td><td class="n">287.4 亿</td><td class="src">留在生意里的股东资本</td></tr>
-  <tr class="hl"><td>每年多赚</td><td class="n">31.4 亿</td><td class="src">留存换来的增量利润</td></tr>
-  <tr class="hl"><td>资本回报率</td><td class="n">约 11%</td><td class="src">每年多赚 ÷ 留存</td></tr>
-</table>
-
-<div class="return">资本成本 10% —— 每 1 元留存每年赚回 0.11 元，高出及格线约 1 个百分点</div>
-
-<div class="note">五年累计所有者收益 265.4 亿，占净利润的 60%——利润有现金支撑，不是账面数字。留存 287.4 亿换回每年多赚 31.4 亿，回报率约 11%：留存在创造复利，但每 1 元留存每年只多创造约 0.01 元的价值，增长的成色平庸。这个回报能否守住，取决于护城河，而不是取决于这五年的算术。</div>
-
-<h3 id="s5-4">估值试算</h3>
-<div class="calc-row">
-  <span>资本成本</span>
-  <input type="range" id="k" min="6" max="15" step="0.5" value="10">
-  <b id="kv">10.0%</b>
-</div>
 <div class="nums">
-  <div><dt>这门生意值多少</dt><dd id="vBase">—</dd></div>
+  <div><dt>留存回报率（五年）</dt><dd>10.8%<small>净利增量 +31.39 ÷ 累计留存 291.76</small></dd></div>
+  <div><dt>五年现金分红（含税）</dt><dd>153.63 亿<small>2021 年含中期分红，占当年净利 50.8%</small></dd></div>
+  <div><dt>回购注销</dt><dd>8.66 亿股<small>2022–2023 年 H 股为主，合计约 84.6 亿港元</small></dd></div>
 </div>
-<div class="return" id="vVerdict"></div>
-<div class="note">这门生意值多少 ＝ 年均所有者收益 53.1 亿 ÷ 资本成本。资本成本由你定，其余数字都是这门生意已经交出的成绩：所有者收益来自前表，增量回报 10.9% 与资本成本一比，方向立判。</div>
+
+<div class="note">现金分红归属利润分配年度，实际付现于次年；2025 年度分红为预案，尚需股东会审议。</div>
+
+<h3 id="s5-2">假设试算</h3>
+
+<div class="note">本节为假设推演，非估值结论。默认取值锚定上表事实：每年赚到的现金＝五年归母净利润均值，留存比例＝累计留存÷累计净利润，留存回报率＝五年净利增量÷累计留存。默认取值不可改；滑钮试算，可一键恢复。</div>
+
+<div class="calc">
+<table>
+  <tr><th>假设</th><th>默认取值</th><th>试算取值</th><th><button type="button" class="calc-reset">恢复默认</button></th></tr>
+  <tr><td>每年赚到的现金</td><td class="n">89.1 亿</td><td class="n cur" data-for="e"><span data-e></span> 亿</td><td class="sld"><input type="range" data-in="e" data-def="89.1" min="44.5" max="178.2" step="0.1" value="89.1"></td></tr>
+  <tr><td>留存比例</td><td class="n">64.5%</td><td class="n cur" data-for="b"><span data-b></span>%</td><td class="sld"><input type="range" data-in="b" data-def="64.5" min="0" max="95" step="0.5" value="64.5"></td></tr>
+  <tr><td>留存回报率</td><td class="n">10.8%</td><td class="n cur" data-for="r"><span data-r></span>%</td><td class="sld"><input type="range" data-in="r" data-def="10.8" min="5.4" max="21.6" step="0.1" value="10.8"></td></tr>
+  <tr><td>资本成本</td><td class="n">10.0%</td><td class="n cur" data-for="k"><span data-k></span>%</td><td class="sld"><input type="range" data-in="k" data-def="10" min="5" max="20" step="0.5" value="10"></td></tr>
+</table>
+
+<div class="chain">
+  <div class="step"><b>每年赚到的现金 · <span data-e></span> 亿</b>五年归母净利润均值，永续</div>
+  <div class="to">→</div>
+  <div class="step"><b>增长 · <span data-g></span>%</b>＝ 留存比例 <span data-b></span>% × 留存回报率 <span data-r></span>%</div>
+  <div class="to">→</div>
+  <div class="step"><b>每年分出 · <span data-d></span> 亿</b>其余分给股东</div>
+  <div class="to">÷</div>
+  <div class="step"><b>资本成本 <span data-k></span>% − 增长 <span data-g></span>%</b>永续增长折现</div>
+  <div class="to">＝</div>
+  <div class="step"><b>现值 · <span data-pv></span> 亿</b>假设下的现金流折现</div>
+</div>
+
+<div class="nums">
+  <div><dt>假设下的价值参考</dt><dd data-v></dd></div>
+</div>
+</div>
 
 </main>
 </div>
@@ -270,22 +295,39 @@
 </footer>
 
 <script>
-(function () {
-  var OE = 53.1, R = 31.4 / 287.4;
-  var k = document.getElementById('k');
+document.querySelectorAll(".calc").forEach(function (calc) {
+  var inputs = {};
+  calc.querySelectorAll("input[type=range]").forEach(function (el) { inputs[el.dataset.in] = el; });
+  function text(sel, v) { calc.querySelectorAll(sel).forEach(function (el) { el.textContent = v; }); }
   function upd() {
-    var cost = parseFloat(k.value) / 100;
-    var pct = (cost * 100).toFixed(1) + '%';
-    document.getElementById('kv').textContent = pct;
-    document.getElementById('vBase').textContent = (OE / cost).toFixed(0) + ' 亿';
-    var v = document.getElementById('vVerdict');
-    if (cost < R) v.textContent = '增量回报 10.9% 高于资本成本 ' + pct + ' —— 增长在加钱，实际价值高于此数';
-    else if (cost > R) v.textContent = '资本成本 ' + pct + ' 高于增量回报 —— 增长在减钱，实际价值低于此数';
-    else v.textContent = '增量回报与资本成本同为 ' + pct + ' —— 增长不加也不减，此数即价值';
+    var e = parseFloat(inputs.e.value), b = parseFloat(inputs.b.value),
+        r = parseFloat(inputs.r.value), k = parseFloat(inputs.k.value);
+    var g = b * r / 100;
+    text("[data-e]", e.toFixed(1));
+    text("[data-b]", b.toFixed(1));
+    text("[data-r]", r.toFixed(1));
+    text("[data-k]", k.toFixed(1));
+    text("[data-g]", g.toFixed(1));
+    calc.querySelectorAll("td.cur").forEach(function (td) {
+      td.classList.toggle("mod", parseFloat(inputs[td.dataset.for].value) !== parseFloat(inputs[td.dataset.for].dataset.def));
+    });
+    if (k - g <= 0.5) {
+      text("[data-d]", "—"); text("[data-pv]", "—");
+      text("[data-v]", "—（留存再投资隐含的增长不低于资本成本，模型不适用）");
+    } else {
+      var d = e * (1 - b / 100), pv = Math.round(d / ((k - g) / 100));
+      text("[data-d]", d.toFixed(1));
+      text("[data-pv]", String(pv));
+      text("[data-v]", "约 " + pv + " 亿");
+    }
   }
-  k.addEventListener('input', upd);
+  Object.keys(inputs).forEach(function (key) { inputs[key].addEventListener("input", upd); });
+  calc.querySelector(".calc-reset").addEventListener("click", function () {
+    Object.keys(inputs).forEach(function (key) { inputs[key].value = inputs[key].dataset.def; });
+    upd();
+  });
   upd();
-})();
+});
 </script>
 
 </body>

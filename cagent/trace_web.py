@@ -1,7 +1,7 @@
 """trace 可视化：
 
-    uv run python -m cagent.trace_web
-    打开 http://localhost:5000
+uv run python -m cagent.trace_web
+打开 http://localhost:5000
 """
 
 import json

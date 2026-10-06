@@ -1,25 +1,9 @@
 import json
-import re
 import textwrap
 from datetime import datetime
 from pathlib import Path
 
 import requests
-
-
-def chunk_text(text: str, budget: int = 32768) -> list[str]:
-    """按字符预算切文本（约 2 字符/token，budget 取 n_ctx 即约 n_ctx/2 token）。
-    切口优先落在 md 标题（行首 #）处，避免截断段落；标题间距超预算时退回硬切。"""
-    heading_positions = [match.start() for match in re.finditer(r"(?m)^#", text)]
-    chunks, chunk_start, previous_heading = [], 0, 0
-    for position in heading_positions + [len(text)]:
-        if position - chunk_start > budget:
-            cut_position = previous_heading if previous_heading > chunk_start else position
-            chunks.append(text[chunk_start:cut_position])
-            chunk_start = cut_position
-        previous_heading = position
-    chunks.append(text[chunk_start:])
-    return chunks
 
 
 class Agent:
@@ -41,7 +25,7 @@ class Agent:
         return response.json()["tokens"]
 
     def n_ctx(self) -> int:
-        """服务端上下文长度（llama.cpp /props），结果缓存。"""
+        """服务端上下文长度（llama.cpp /props），结果缓存。调用方按它决定 prefill 预算。"""
         if not hasattr(self, "_n_ctx"):
             response = requests.get(f"{self.base_url.removesuffix('/v1')}/props")
             response.raise_for_status()
@@ -69,6 +53,9 @@ class Agent:
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
         return content
 
+    def chat_prompt(self, prompt: str) -> str:
+        return self.chat(messages=[{"role": "user", "content": prompt}], temperature=0)
+
     def chat_json(self, prompt: str, schema: dict) -> dict:
         """带 json_schema 约束的聊天，temperature=0，返回解析后的 dict。"""
         return json.loads(
@@ -79,31 +66,34 @@ class Agent:
             )
         )
 
-    def pick_chapters(self, chapters: list[dict], task: str) -> list[int]:
-        """给精确的章节标题列表和阅读目的，让模型选出要精读的章节序号。
+    def chat_reduce_chunks(self, prompt: str, chunks: list[str]) -> str:
+        result = ""
+        for chunk in chunks:
+            message = textwrap.dedent(f"""
+                {prompt}
+                <rule>
+                目前已经整理好的文档在 <current-result>，把 <chunk> 里的信息合并进来；
+                有新增内容时 updated=true，更新result；补齐此前缺失（未单列、留空）的格子也算新增内容
+                没有新增内容时 updated=false, result留空
+                </rule>
+                <current-result>
+                {result}
+                </current-result>
 
-        不做标题关键字匹配——选章是理解任务，交给模型，每家公司每年选一次。
-        """
-        listing = "\n".join(f'<chapter index="{index}">\n{chapter["title"]}\n</chapter>' for index, chapter in enumerate(chapters))
-        prompt = textwrap.dedent(f"""
-            <requirements>
-            {task}
-            从列表里选，返回章节序号。
-            </requirements>
-
-            <chapters>
-            {listing}
-            </chapters>
-        """).strip()
-        indexes = self.chat_json(
-            prompt,
-            {
-                "type": "object",
-                "properties": {"indexes": {"type": "array", "items": {"type": "integer"}}},
-                "required": ["indexes"],
-            },
-        )["indexes"]
-        picked = [index for index in indexes if 0 <= index < len(chapters)]
-        if not picked:
-            raise ValueError("模型没有返回有效章节序号")
-        return picked
+                <chunk>
+                {chunk}
+                </chunk>""").strip()
+            resp = self.chat_json(
+                message,
+                {
+                    "type": "object",
+                    "properties": {
+                        "updated": {"type": "boolean"},
+                        "result": {"type": "string"},
+                    },
+                    "required": ["updated", "result"],
+                },
+            )
+            if resp.pop("updated", True) and resp.get("result", "").strip():
+                result = resp["result"]
+        return result.strip()
