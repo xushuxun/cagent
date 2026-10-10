@@ -32,10 +32,15 @@
   table { width:100%; border-collapse:collapse; font-size:13px; margin:6px 0 10px; }
   th { text-align:left; font-weight:500; font-size:12px; color:var(--mute); border-bottom:1px solid var(--ink); padding:5px 8px 5px 0; white-space:nowrap; }
   td { border-bottom:1px solid var(--line); padding:5px 8px 5px 0; vertical-align:top; }
-  td.n { font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap; }
+  td.n { font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right; padding-right:6px; }
+  th:not(:first-child) { text-align:right; padding-right:6px; }
   td.src, td .src { color:var(--mute); font-size:12px; white-space:nowrap; }
   td.q { color:#2c2a26; }
   tr.hl td { background:var(--panel); }
+  tr.sub td { background:var(--panel); font-weight:600; border-top:1px solid var(--ink); }
+  tr.comp td:first-child { padding-left:20px; }
+  tr.min td { color:var(--mute); }
+  tr.grp td { border-bottom:none; color:var(--mute); font-size:12px; padding-top:10px; }
 
   .stats td:first-child { color:var(--mute); font-weight:400; }
   .stats tr.hl td:first-child { color:var(--ink); font-weight:600; }
@@ -63,11 +68,8 @@
   .note { background:var(--panel); border-radius:6px; padding:8px 12px; margin:10px 0; color:var(--mute); font-size:12.5px; }
   .note b { color:var(--ink); font-variant-numeric:tabular-nums; }
 
-  td.sld { width:24%; }
-  td.sld input[type=range] { width:100%; accent-color:var(--accent); }
-  td.cur.mod, td.cur.mod span { color:var(--accent); }
-  .calc-reset { font-size:11px; color:var(--mute); background:none; border:1px solid var(--line); border-radius:4px; padding:1px 8px; cursor:pointer; white-space:nowrap; }
-  .calc-reset:hover { color:var(--accent); border-color:var(--accent); }
+  .copy-btn { margin-left:auto; font-size:12.5px; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:5px 14px; cursor:pointer; font-family:inherit; }
+  .copy-btn:hover { border-color:var(--accent); color:var(--accent); }
 
   footer.site { max-width:1200px; margin:0 auto; padding:14px 32px 40px 232px; color:var(--mute); font-size:12px; border-top:1px solid var(--line); }
   @media (max-width:860px) { aside { display:none; } footer.site { padding-left:32px; }
@@ -77,7 +79,7 @@
 </head>
 <body>
 
-<div class="topbar"><b>{topbar}</b><span>{ticker}</span></div>
+<div class="topbar"><b>{topbar}</b><span>{ticker}</span><button class="copy-btn" onclick="copyReport(this)">复制全文与估值 Prompt</button></div>
 
 <div class="layout">
 <aside>
@@ -97,44 +99,49 @@
 </footer>
 
 <script>
-document.querySelectorAll(".calc").forEach(function (calc) {
-  var inputs = {};
-  calc.querySelectorAll("input[type=range]").forEach(function (el) { inputs[el.dataset.in] = el; });
-  function text(sel, v) { calc.querySelectorAll(sel).forEach(function (el) { el.textContent = v; }); }
-  function upd() {
-    var e = parseFloat(inputs.e.value), g = parseFloat(inputs.g.value),
-        r = parseFloat(inputs.r.value), k = parseFloat(inputs.k.value);
-    text("[data-e]", e.toFixed(1));
-    text("[data-g]", g.toFixed(1));
-    text("[data-r]", r.toFixed(1));
-    text("[data-k]", k.toFixed(1));
-    calc.querySelectorAll("td.cur").forEach(function (td) {
-      td.classList.toggle("mod", parseFloat(inputs[td.dataset.for].value) !== parseFloat(inputs[td.dataset.for].dataset.def));
-    });
-    var bad = null;
-    if (g !== 0 && r <= 0) bad = "留存回报为零，增长无从谈起";
-    var b = g === 0 ? 0 : g / r;
-    if (b > 1) bad = "增长超出留存回报的支撑";
-    if (k - g <= 0.5) bad = "增长不低于资本成本，模型不适用";
-    if (bad) {
-      text("[data-b]", "—"); text("[data-d]", "—"); text("[data-pv]", "—");
-      text("[data-v]", "—（" + bad + "）");
-    } else {
-      var d = e * (1 - b), pv = Math.round(d / ((k - g) / 100));
-      text("[data-b]", (b * 100).toFixed(0));
-      text("[data-d]", d.toFixed(1));
-      text("[data-pv]", String(pv));
-      text("[data-v]", "约 " + pv + " 亿");
+var VALUATION_PROMPT = [
+  '以下是一家中国上市公司的研究报告全文（历年年报合并口径，单位：亿元人民币），只陈列数据，不含估值结论。',
+  '请用巴菲特、芒格、李录的价值投资框架为其估值：取正常化利润并说明口径与周期位置；按 10% 左右资本成本折算；加净现金类资产（本报告只有利润数据，请依年报资产负债表自行计算）；只有增量资本回报持续高于资本成本时才为成长付费。给出区间而非单点，估值是假设下的推演，不是结论。',
+  '—— 报告全文 ——'
+].join('\n');
+
+function reportText() {
+  var main = document.querySelector('main');
+  var out = [document.querySelector('.topbar b').textContent.trim()];
+  main.querySelectorAll(':scope > *').forEach(function (el) {
+    if (el.tagName === 'H2') { out.push('\n## ' + el.textContent.trim()); }
+    else if (el.tagName === 'H3') { out.push('\n### ' + el.textContent.trim()); }
+    else if (el.tagName === 'TABLE') {
+      el.querySelectorAll('tr').forEach(function (tr) {
+        var cells = Array.prototype.map.call(tr.querySelectorAll('th,td'), function (c) { return c.textContent.trim(); });
+        out.push(cells.join(' | '));
+      });
     }
-    text("[data-cmp]", r > k ? "留存回报更高，增长加分" : r < k ? "资本成本更高，增长减分" : "两者相等，增长不影响");
-  }
-  Object.keys(inputs).forEach(function (key) { inputs[key].addEventListener("input", upd); });
-  calc.querySelector(".calc-reset").addEventListener("click", function () {
-    Object.keys(inputs).forEach(function (key) { inputs[key].value = inputs[key].dataset.def; });
-    upd();
+    else {
+      var t = el.textContent.replace(/\s+/g, ' ').trim();
+      if (t) out.push(t);
+    }
   });
-  upd();
-});
+  return out.join('\n');
+}
+
+function copyReport(btn) {
+  var text = VALUATION_PROMPT + '\n\n' + reportText();
+  function done() {
+    var old = btn.textContent;
+    btn.textContent = '已复制';
+    setTimeout(function () { btn.textContent = old; }, 1500);
+  }
+  function fallback() {
+    var ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(done, fallback);
+  } else { fallback(); }
+}
 </script>
 
 </body>

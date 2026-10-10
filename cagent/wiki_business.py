@@ -93,8 +93,8 @@ def _intro_prompt() -> str:
 
 
 
-def _load_latest_annual(agent: Agent, stock: str, market: str, root: Path) -> tuple[int, Toc, list[int], list[str]]:
-    """加载最新一份年报，选择相关章节。返回 (year, toc, picked, chunks)。"""
+def _load_latest_annual(agent: Agent, stock: str, market: str, root: Path) -> tuple[int, Path, Toc, list[int], list[str]]:
+    """加载最新一份年报，选择相关章节。返回 (year, md_path, toc, picked, chunks)。"""
     mds = sorted((root / market / stock / "derived").glob("*.md"))
     if not mds:
         raise SystemExit(f"{root / market / stock / 'derived'} 没有年报 md，先跑 ocr/cli.py")
@@ -108,14 +108,14 @@ def _load_latest_annual(agent: Agent, stock: str, market: str, root: Path) -> tu
 
     logger.info(f"选中章节: {[toc.chapters[i]['title'] for i in picked]}")
     chunks = [chunk for i in picked for chunk in toc.chapter_text_chunk(i)]
-    return report_year(agent, md_path), toc, picked, chunks
+    return report_year(agent, md_path), md_path, toc, picked, chunks
 
 
 def gen_business(agent: Agent, stock: str, market: str, root: Path, force: bool) -> tuple[int, str]:
     # 商业模式分析只需要最新一份年报
-    year, toc, picked, chunks = _load_latest_annual(agent, stock, market, root)
+    year, md_path, toc, picked, chunks = _load_latest_annual(agent, stock, market, root)
 
-    out_path = root / market / stock / "knowledge" / f"fy{year}" / "business.json"
+    out_path = root / market / stock / "knowledge" / md_path.stem / "business.json"
     if out_path.exists() and not force:
         logger.info(f"跳过（已存在）: {out_path}")
         return year, json.loads(out_path.read_text(encoding="utf-8"))["doc"]
@@ -147,11 +147,6 @@ def main() -> None:
 
     agent = Agent(trace=True)
     gen_business(agent, args.stock, args.market, Path(args.root), args.force)
-
-    from cagent.wiki_render import render_module
-
-    html_path = render_module(Path(args.root), args.market, args.stock, "business", Path("output/wiki") / f"{args.market}_{args.stock}" / "business.html")
-    logger.info(f"渲染: {html_path}")
 
 
 if __name__ == "__main__":

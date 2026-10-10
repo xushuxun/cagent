@@ -69,14 +69,15 @@ def gen_products(agent: Agent, stock: str, market: str, root: Path, force: bool,
     mds = sorted(derived.glob("*.md"))
     if not mds:
         raise SystemExit(f"{derived} 没有年报 md，先跑 ocr/cli.py")
-    tocs = {report_year(agent, p): Toc(agent, p) for p in mds}
+    md_by_year = {report_year(agent, p): p for p in mds}
+    tocs = {year: Toc(agent, p) for year, p in md_by_year.items()}
 
     knowledge_dir = root / market / stock / "knowledge"
     docs = []
     for year, toc in sorted(tocs.items()):
         if years and year not in years:
             continue
-        out_path = knowledge_dir / f"fy{year}" / "products.json"
+        out_path = knowledge_dir / md_by_year[year].stem / "products.json"
         if out_path.exists() and not force:
             logger.info(f"跳过（已存在）: {out_path}")
             docs.append((year, json.loads(out_path.read_text(encoding="utf-8"))["doc"]))
@@ -115,10 +116,6 @@ def main() -> None:
     agent = Agent(trace=True)
     gen_products(agent, args.stock, args.market, Path(args.root), args.force, years)
 
-    from cagent.wiki_render import render_module
-
-    html_path = render_module(Path(args.root), args.market, args.stock, "products", Path("output/wiki") / f"{args.market}_{args.stock}" / "products.html")
-    logger.info(f"渲染: {html_path}")
 
 
 if __name__ == "__main__":
