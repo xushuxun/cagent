@@ -68,21 +68,21 @@ def _decision_prompt() -> str:
 _pick_task = "逐年蒸馏管理层对行业大环境的判断与当年的重大经营决策。这类内容通常在年报的“管理层讨论与分析”章节，请结合目录标题选择要精读的章节（可多个）。"
 
 
-def _load_tocs(agent: Agent, stock: str, market: str, root: Path) -> dict[int, Toc]:
+def _load_tocs(agent: Agent, stock: str, market: str, root: Path) -> dict[int, tuple[Toc, Path]]:
     derived = root / market / stock / "derived"
     mds = sorted(derived.glob("*.md"))
     if not mds:
         raise SystemExit(f"{derived} 没有年报 md，先跑 ocr/cli.py")
-    return {report_year(agent, p): Toc(agent, p) for p in mds}
+    return {report_year(agent, p): (Toc(agent, p), p) for p in mds}
 
 
 def gen_decisions(agent: Agent, stock: str, market: str, root: Path, force: bool, years: list[int] | None = None) -> list[tuple[int, str]]:
     knowledge_dir = root / market / stock / "knowledge"
     docs = []
-    for year, toc in sorted(_load_tocs(agent, stock, market, root).items()):
+    for year, (toc, md_path) in sorted(_load_tocs(agent, stock, market, root).items()):
         if years and year not in years:
             continue
-        out_path = knowledge_dir / f"fy{year}" / "decisions.json"
+        out_path = knowledge_dir / md_path.stem / "decisions.json"
         if out_path.exists() and not force:
             logger.info(f"跳过（已存在）: {out_path}")
             docs.append((year, json.loads(out_path.read_text(encoding="utf-8"))["doc"]))
@@ -121,10 +121,6 @@ def main() -> None:
     agent = Agent(trace=True)
     gen_decisions(agent, args.stock, args.market, Path(args.root), args.force, years)
 
-    from cagent.wiki_render import render_module
-
-    html_path = render_module(Path(args.root), args.market, args.stock, "decisions", Path("output/wiki") / f"{args.market}_{args.stock}" / "decisions.html")
-    logger.info(f"渲染: {html_path}")
 
 
 if __name__ == "__main__":

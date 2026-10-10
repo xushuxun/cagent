@@ -16,9 +16,5 @@ uv.lock
 output/
 # 数据目录（lakehouse 默认根）
 .cagent/
-# 报告
-reports/
-
-.env
-
-web/
+# 交付报告
+wiki/

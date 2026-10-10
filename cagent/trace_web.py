@@ -30,7 +30,7 @@ def index():
                 "mtime": datetime.fromtimestamp(st.st_mtime).strftime("%m-%d %H:%M"),
             }
         )
-    return render_template("index.html", files=files)
+    return render_template("trace_index.html", files=files)
 
 
 @app.route("/trace/<name>")
@@ -39,7 +39,7 @@ def trace(name):
     if not f.is_file() or "/" in name or name.startswith("."):
         abort(404)
     records = [json.loads(line) for line in f.read_text(encoding="utf-8").splitlines()]
-    return render_template("trace.html", name=name, records=records)
+    return render_template("trace_trace.html", name=name, records=records)
 
 
 if __name__ == "__main__":
