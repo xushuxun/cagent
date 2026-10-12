@@ -56,6 +56,10 @@
     .year { flex:1 1 40%; }
     {% endif %}
   }
+  {% if layout == 'decisions' %}
+  main table th:first-child, main table td:first-child { white-space:nowrap; text-align:right; font-variant-numeric:tabular-nums; padding-right:6px; }
+  main table td:nth-child(2) { width:44%; }
+  {% endif %}
 </style>
 </head>
 <body>

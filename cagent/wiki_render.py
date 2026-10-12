@@ -17,7 +17,7 @@ _TEMPLATE = Path(__file__).parent / "templates" / "wiki.html"
 _LAYOUTS = {
     "生意模式": "default",
     "产品与销量": "columns",
-    "历年经营决策": "default",
+    "历年经营决策": "decisions",
 }
 
 
