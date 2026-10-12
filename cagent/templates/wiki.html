@@ -16,13 +16,19 @@
   .copy-btn:hover { border-color:var(--accent); color:var(--accent); }
 
   .layout { display:flex; max-width:1200px; margin:0 auto; }
-  main { flex:1; min-width:0; padding:16px 32px 60px 32px; max-width:920px; }
+  aside { width:180px; flex:none; padding:20px 16px 40px 24px; position:sticky; top:41px; align-self:flex-start; }
+  aside .nav-title { font-size:11px; color:var(--mute); letter-spacing:.08em; margin-bottom:8px; }
+  aside a { display:block; color:var(--mute); text-decoration:none; font-size:13px; padding:3px 0 3px 10px; border-left:2px solid transparent; }
+  aside a:hover { color:var(--ink); }
+  aside a.sub { padding-left:22px; font-size:12.5px; }
+  aside a:target { color:var(--accent); border-left-color:var(--accent); }
+  main { flex:1; min-width:0; padding:16px 32px 60px 8px; max-width:920px; }
 
   h2 { font-size:16px; font-weight:600; margin:30px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--line); scroll-margin-top:56px; }
   h2:first-child { margin-top:8px; }
-  h3 { font-size:13.5px; font-weight:600; margin:18px 0 6px; scroll-margin-top:56px; }
-  h4 { font-size:14px; font-weight:600; margin:22px 0 8px; padding-bottom:5px; border-bottom:1px solid var(--line); scroll-margin-top:56px; }
-  h4:first-child { margin-top:8px; }
+  h3 { font-size:15px; font-weight:600; margin:26px 0 8px; padding-bottom:5px; border-bottom:1px solid var(--line); scroll-margin-top:56px; }
+  h3:first-child { margin-top:8px; }
+  h4 { font-size:13.5px; font-weight:600; margin:18px 0 6px; scroll-margin-top:56px; }
 
   table { width:100%; border-collapse:collapse; font-size:13px; margin:6px 0 10px; }
   th { text-align:left; font-weight:500; font-size:12px; color:var(--mute); border-bottom:1px solid var(--ink); padding:5px 8px 5px 0; white-space:nowrap; }
@@ -40,69 +46,91 @@
   .note { background:var(--panel); border-radius:6px; padding:8px 12px; margin:10px 0; color:var(--mute); font-size:12.5px; }
   .note b { color:var(--ink); font-variant-numeric:tabular-nums; }
 
-  {% if layout == 'columns' %}
-  .years { display:flex; gap:10px; align-items:flex-start; margin:10px 0; }
-  .year { flex:1; min-width:0; }
-  .year > b { display:block; font-size:12.5px; color:var(--mute); font-weight:600; border-bottom:1px solid var(--ink); padding-bottom:3px; margin-bottom:2px; }
-  .year table { margin:0; font-size:12.5px; }
-  .year td { padding:3px 4px 3px 0; }
-  .year p { margin:4px 0 0; font-size:12px; color:var(--mute); text-align:left; }
-  {% endif %}
+  /* columns 版式：年份并排分栏，对齐原型「产品与销量」 */
+  .columns .years { display:flex; gap:14px; align-items:flex-start; margin:10px 0; }
+  .columns .year { flex:1; min-width:0; }
+  .columns .year > b { display:block; font-size:12.5px; color:var(--mute); font-weight:600; border-bottom:1px solid var(--ink); padding-bottom:3px; margin-bottom:2px; }
+  .columns .year table { margin:0; font-size:12.5px; table-layout:fixed; }
+  .columns .year th { padding:3px 4px 3px 0; white-space:normal; word-break:break-all; }
+  .columns .year td { padding:3px 4px 3px 0; word-break:break-all; }
+  .columns .year th:first-child, .columns .year td:first-child { width:60%; }
+  .columns .year th:last-child, .columns .year td:last-child { width:40%; white-space:nowrap; text-align:right; font-variant-numeric:tabular-nums; overflow:hidden; }
+  .columns .year p { margin:4px 0 0; font-size:12px; color:var(--mute); text-align:left; }
 
-  footer.site { max-width:1200px; margin:0 auto; padding:14px 32px 40px; color:var(--mute); font-size:12px; border-top:1px solid var(--line); }
   @media (max-width:860px) {
-    {% if layout == 'columns' %}
-    .years { flex-wrap:wrap; }
-    .year { flex:1 1 40%; }
-    {% endif %}
+    aside { display:none; }
+    main { padding-left:32px; }
+    .columns .years { flex-wrap:wrap; }
+    .columns .year { flex:1 1 40%; }
   }
-  {% if layout == 'decisions' %}
-  main table th:first-child, main table td:first-child { white-space:nowrap; text-align:right; font-variant-numeric:tabular-nums; padding-right:6px; }
-  main table td:nth-child(2) { width:44%; }
-  {% endif %}
+  /* decisions 版式：仅作用于容器的直接子表（年份列窄、右对齐，判断/决策两列定宽平衡） */
+  .decisions > table { table-layout:fixed; font-size:13px; }
+  .decisions > table th, .decisions > table td { padding:7px 10px 7px 0; line-height:1.75; }
+  .decisions > table th:first-child, .decisions > table td:first-child { width:48px; white-space:nowrap; text-align:right; font-variant-numeric:tabular-nums; color:var(--mute); padding-right:8px; }
+  .decisions > table td:nth-child(2) { width:44%; color:#2c2a26; }
+  .decisions > table tr:last-child td { border-bottom:none; }
 </style>
 </head>
 <body>
 
-<div class="topbar"><b>{{ topbar }}</b><span>{{ ticker }}</span><button class="copy-btn" onclick="copyReport(this)">复制全文与估值 Prompt</button></div>
+<div class="topbar"><b>{{ title }}</b><span>{{ ticker }}</span><button class="copy-btn" onclick="copyReport(this)">复制全文与估值 Prompt</button></div>
 
 <div class="layout">
+<aside>
+  <div class="nav-title">目录</div>
+  <nav id="toc"></nav>
+</aside>
 <main>
+<div id="doc" class="doc {{ layout }}">
 <script type="text/markdown" id="md">
 {{ doc }}
 </script>
+</div>
 </main>
 </div>
 
-<footer class="site">
-{{ footer }}
-</footer>
-
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
-var main = document.querySelector('main');
-main.innerHTML = marked.parse(document.getElementById('md').textContent.trim());
+var doc = document.getElementById('doc');
+doc.innerHTML = marked.parse(document.getElementById('md').textContent.trim());
 
-{% if layout == 'columns' %}
-// 年份分栏：纯年份标题（#### 2021）与其后的表格、口径注合成一栏，对齐原型「产品与销量」
-var years = document.createElement('div');
-years.className = 'years';
-var year = null;
-Array.prototype.slice.call(main.children).forEach(function (el) {
-  if (el.tagName === 'H4' && /^\d{4}$/.test(el.textContent.trim())) {
-    year = document.createElement('div');
-    year.className = 'year';
-    var b = document.createElement('b');
-    b.textContent = el.textContent.trim();
-    year.appendChild(b);
-    years.appendChild(year);
-    el.remove();
-  } else if (year) {
-    year.appendChild(el);
-  }
+// columns 版式：纯年份标题（#### 2021）与其后的表格、口径注合成一栏；只作用于本容器
+if (doc.classList.contains('columns')) {
+  var years = document.createElement('div');
+  years.className = 'years';
+  var year = null, anchor = null;
+  Array.prototype.slice.call(doc.children).forEach(function (el) {
+    if (el.tagName === 'H4' && /^\d{4}$/.test(el.textContent.trim())) {
+      year = document.createElement('div');
+      year.className = 'year';
+      var b = document.createElement('b');
+      b.textContent = el.textContent.trim();
+      year.appendChild(b);
+      years.appendChild(year);
+      el.remove();
+    } else if (/^H[1-4]$/.test(el.tagName)) {
+      if (year) anchor = el; // 任意更高级标题都关闭分栏：记录结束位置，分栏整体插回原处
+      year = null;
+    } else if (year) {
+      year.appendChild(el);
+    }
+  });
+  if (years.children.length) doc.insertBefore(years, anchor); // anchor 为 null 时等同 append
+}
+
+// 目录：h3 为栏目、h4 为小节，锚点与链接前端生成
+var toc = document.getElementById('toc');
+Array.prototype.slice.call(doc.children).forEach(function (el) {
+  if (el.tagName !== 'H3' && el.tagName !== 'H4') return;
+  if (el.closest('.years')) return; // 分栏内的年份标题不进目录
+  var id = 'toc-' + toc.children.length;
+  el.id = id;
+  var a = document.createElement('a');
+  a.href = '#' + id;
+  a.textContent = el.textContent.trim();
+  if (el.tagName === 'H4') a.className = 'sub';
+  toc.appendChild(a);
 });
-if (years.children.length) main.appendChild(years);
-{% endif %}
 </script>
 
 <script>
@@ -113,9 +141,9 @@ var VALUATION_PROMPT = [
 ].join('\n');
 
 function reportText() {
-  var main = document.querySelector('main');
+  var doc = document.getElementById('doc');
   var out = [document.querySelector('.topbar b').textContent.trim()];
-  main.querySelectorAll(':scope > *').forEach(function (el) {
+  doc.querySelectorAll(':scope > *').forEach(function (el) {
     if (el.tagName === 'H2') { out.push('\n## ' + el.textContent.trim()); }
     else if (el.tagName === 'H3') { out.push('\n### ' + el.textContent.trim()); }
     else if (el.tagName === 'TABLE') {

@@ -124,7 +124,7 @@ def main() -> None:
 
     if args.render:
         html_output_path = output_dir / "decisions.html"
-        html_output_path.write_text(render_doc(doc, title=f"{args.stock} · 历年经营决策", ticker=args.stock), encoding="utf-8")
+        html_output_path.write_text(render_doc(doc, title=f"{args.stock} · 历年经营决策", ticker=args.stock, layout="decisions"), encoding="utf-8")
         logger.info(f"渲染: {html_output_path}")
 
 
