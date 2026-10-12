@@ -73,8 +73,8 @@ class Agent:
                 {prompt}
                 <rule>
                 目前已经整理好的文档在 <current-result>，把 <chunk> 里的信息合并进来；
-                有新增内容时 updated=true，更新result；补齐此前缺失（未单列、留空）的格子也算新增内容
-                没有新增内容时 updated=false, result留空
+                有内容变化时 updated=true，更新result；
+                没有内容变化时 updated=false, result留空
                 </rule>
                 <current-result>
                 {result}
