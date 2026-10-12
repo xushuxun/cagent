@@ -66,15 +66,14 @@ class Agent:
             )
         )
 
-    def chat_reduce_chunks(self, prompt: str, chunks: list[str]) -> str:
-        result = ""
+    def chat_reduce_chunks(self, prompt: str, chunks: list[str], result: str = "") -> str:
         for chunk in chunks:
             message = textwrap.dedent(f"""
                 {prompt}
                 <rule>
-                目前已经整理好的文档在 <current-result>，把 <chunk> 里的信息合并进来；
-                有内容变化时 updated=true，更新result；
-                没有内容变化时 updated=false, result留空
+                目前已经整理好的结果在 <current-result>，把 <chunk> 里的信息合并进来并重新整理，不要重复，删除冲突部分；
+                需要更新结果时 updated=true，返回新的result；
+                结果不需要更新时 updated=false, result留空
                 </rule>
                 <current-result>
                 {result}

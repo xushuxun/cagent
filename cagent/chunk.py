@@ -140,6 +140,24 @@ def split_pages(text: str) -> list[str]:
     """
     return _PAGE_RE.split(text)[1:]
 
+def _is_page_english(agent: Agent, page_text: str) -> bool:
+    prompt = textwrap.dedent(f"""
+        <requirements>
+        页面是否是英文内容
+        </requirements>
+
+        <page-content>
+        {page_text}
+        </page-content>
+    """)
+
+    response_format = {
+        "type": "object",
+        "properties": {"is_english": {"type": "boolean"}},
+        "required": ["is_english"],
+    }
+    return agent.chat_json(prompt=prompt, schema=response_format)["is_english"] 
+
 
 def _is_page_has_toc(agent: Agent, page_text: str) -> bool:
     prompt = textwrap.dedent(f"""
@@ -278,7 +296,11 @@ def _align_toc(agent: Agent, pages: list[str], chapters: list[dict]) -> list[dic
             if 0 < md_page <= len(pages) and _is_page_chapter_first(agent, ch, pages[md_page - 1]):
                 aligned.append({**ch, "md_page": md_page})
                 continue
-        offset = _compute_page_offset(agent, pages, ch)
+        try:
+            offset = _compute_page_offset(agent, pages, ch)
+        except ValueError as e:
+            logger.warning(f"跳过无法定位的章节: {e}")
+            continue
         aligned.append({**ch, "md_page": ch["page"] + offset})
     return aligned
 
@@ -333,13 +355,17 @@ class Toc:
         pages = split_pages(annual)
 
         toc_text = ""
-        for p in pages[:20]:
+        for p in pages:
             has_toc = _is_page_has_toc(self.agent, p)
+            if _is_page_english(self.agent, p):
+                continue
             if has_toc is True:
                 toc_text += p + "\n\n"
             elif has_toc is False and toc_text:
                 # 已经收集到目录，遇到第一个非目录页说明目录结束
                 break
+        if not toc_text:
+            raise ValueError(f"未找到目录页: {md_path}")
 
         chapters = _extract_toc_from_text(self.agent, toc_text)
         aligned = _align_toc(self.agent, pages, chapters)

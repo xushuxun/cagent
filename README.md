@@ -40,8 +40,8 @@ VLLM_WSL2_ENABLE_PIN_MEMORY=1 vllm serve \
   --trust-remote-code \
   --served-model-name OvisOCR2 \
   --mm-processor-cache-gb 0 \
-  --max-model-len 32768 \
-  --gpu-memory-utilization 0.70
+  --max-model-len 65536 \
+  --gpu-memory-utilization 0.80
 ```
 
 ## 运行

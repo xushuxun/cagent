@@ -109,7 +109,7 @@ def gen_business(agent: Agent, stock: str, market: str, root: Path) -> str:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S", stream=sys.stderr)
-    parser = argparse.ArgumentParser(description="business 模块：蒸馏生意过程")
+    parser = argparse.ArgumentParser(description="business 模块：总结生意过程")
     parser.add_argument("--stock", default="601633")
     parser.add_argument("--market", default="cn", choices=["cn", "hk"])
     parser.add_argument("--root", default=str(Path(__file__).resolve().parents[1] / ".cagent"))
