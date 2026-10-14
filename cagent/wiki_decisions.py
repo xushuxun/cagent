@@ -1,7 +1,7 @@
 """decisions 模块：公司历年经营决策 writer
 
 逐年两段蒸馏：先提取管理层对行业大环境的判断，再提取当年的重大经营决策，
-代码拼接为一张三列 markdown 表格，产物
+按年份分段输出（每年两个小节），产物
 output/wiki/<market>/<stock>/decisions.md。只产内容，不管 UI；页面渲染见 wiki_render.py。
 
 用法：
@@ -100,29 +100,17 @@ def _decide_prompt() -> str:
         {"\n".join(f"<example>{e}</example>" for e in _decide_examples)}
         </examples>""").strip()
 
-def _cell(text: str) -> str:
-    lines = text.strip().replace("|", r"\|").split("\n")
-    out, i = [], 0
-    while i < len(lines):
-        line = lines[i].strip()
-        if line.startswith(("- ", "* ")):  # 无序列表
-            items = []
-            while i < len(lines) and lines[i].strip().startswith(("- ", "* ")):
-                items.append(f"<li>{lines[i].strip()[2:]}</li>")
-                i += 1
-            out.append("<ul>" + "".join(items) + "</ul>")
-        elif re.match(r"^\d+\. ", line):  # 有序列表
-            items = []
-            while i < len(lines) and re.match(r"^\d+\. ", lines[i].strip()):
-                items.append(f"<li>{re.sub(r'^\d+\. ', '', lines[i].strip())}</li>")
-                i += 1
-            out.append("<ol>" + "".join(items) + "</ol>")
-        else:
-            out.append(line)
-            i += 1
-    # 段落之间用空行分隔；HTML 块内部不再加 <br>
-    html = "\n".join(out)
-    return re.sub(r"\n{2,}", "<br><br>", re.sub(r"(?<!\")\n(?!\<)", "<br>", html))
+def _bullets(text: str) -> str:
+    """规整列表排版：句读后被并入同一行的 "- " 条目拆回独立行。"""
+    return re.sub(r"(?<=[。；;])\s+(?=[-*] )", "\n", text.strip())
+
+
+def _distill(agent: Agent, prompt: str, chunks: list[str]) -> str:
+    """蒸馏一段叙述：全文装得下就一次性直读（避免逐块归并丢内容），装不下退回逐块归并。"""
+    text = "\n".join(chunks)
+    if len(agent.tokenize(text)) < agent.n_ctx() - 16384:
+        return agent.chat_prompt(f"{prompt}\n\n<report>\n{text}\n</report>").strip()
+    return agent.chat_reduce_chunks_loop_once(prompt, chunks)
 
 
 def gen_decisions(agent: Agent, stock: str, market: str, root: Path) -> str:
@@ -132,7 +120,7 @@ def gen_decisions(agent: Agent, stock: str, market: str, root: Path) -> str:
         raise SystemExit(f"{derived} 没有年报 md，先跑 ocr/cli.py")
     md_by_year = {report_year(agent, p): p for p in mds}
 
-    rows = []
+    parts = ["# 历年经营决策\n"]
     for year, md_path in sorted(md_by_year.items())[-5:]:
         toc = Toc(agent, md_path)
         logger.info(f"阅读: {md_path.name}")
@@ -143,15 +131,14 @@ def gen_decisions(agent: Agent, stock: str, market: str, root: Path) -> str:
         chunks = [chunk for i in picked for chunk in toc.chapter_text_chunk(i)]
 
         logger.info(f"{year} gen …")
-        judge = agent.chat_reduce_chunks(_judge_prompt(), chunks).strip()
-        decide = agent.chat_reduce_chunks(_decide_prompt(), chunks).strip()
+        judge = _bullets(_distill(agent, _judge_prompt(), chunks))
+        decide = _bullets(_distill(agent, _decide_prompt(), chunks))
         if not judge or not decide:
             raise ValueError(f"{year} decisions 分析异常")
 
-        rows.append(f"| {year} | {_cell(judge)} | {_cell(decide)} |")
+        parts.append(f"## {year}\n\n**管理层对行业大环境的判断**\n\n{judge}\n\n**当年的重大经营决策**\n\n{decide}\n")
 
-    header = "| 年份 | 管理层对行业大环境的判断 | 当年的重大经营决策 |\n| --- | --- | --- |"
-    return "# 历年经营决策\n\n" + header + "\n" + "\n".join(rows) + "\n"
+    return "\n".join(parts)
 
 
 def main() -> None:

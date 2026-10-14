@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # 模块顺序即页面栏目顺序；每个 gen 输出的 markdown 自带一级标题
 _MODULES = [
     ("business", gen_business),
-    ("products", gen_products),
+    # ("products", gen_products),
     ("decisions", gen_decisions),
     ("finance", gen_finance),
 ]
