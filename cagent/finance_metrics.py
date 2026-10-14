@@ -59,6 +59,8 @@ def incremental_return(series: _SERIES, year: int, window: int = 3) -> float | N
     """增量资本回报：窗口内 Δ归母净利润 ÷ Δ归母净资产（PRD:39-40）。
 
     增长值与资本成本的分界只看这条：再投进去的每一元赚多少。
+    注意：Δ归母净资产含增发、回购与其他综合收益变动，financials.json 无股权融资明细，
+    序列中有大额增发时本指标会被压低，解读须结合资本配置事件。
     """
     base = series.get(year - window)
     fin = series.get(year)
@@ -110,25 +112,38 @@ def owner_earnings(fin: _FIN, prev: _FIN | None) -> float | None:
 
 
 def cash_quality(fin: _FIN) -> float | None:
-    """净现比 = 经营现金流净额 ÷ 归母净利润（课程「漏斗一」：报了利润收不回现金）。"""
-    return _div(_g(fin, "cashflow", "ocf"), _g(fin, "income", "net_profit_parent"))
+    """净现比 = 经营现金流净额 ÷ 净利润（含少数股东）。
+
+    经营现金流是整个合并主体的口径，分母必须配对合并净利润；少数股东占比大时
+    用归母净利润会系统性高估（课程「漏斗一」：报了利润收不回现金）。
+    """
+    return _div(_g(fin, "cashflow", "ocf"), _g(fin, "income", "net_profit"))
 
 
-def pie_split(fin: _FIN) -> dict[str, float | None]:
-    """分饼：每 100 元收入中各项成本费用占多少（课程「利润表是分饼图」）。股东（净利润）排最后。"""
+def income_split(fin: _FIN) -> dict[str, float | None]:
+    """收入去向：每 100 元收入中各项成本费用占多少（课程「利润表记录收入在利益相关方之间的分配」）。
+
+    股东（归母净利润）排最后；所得税、少数股东损益单独列示，其他损益是
+    投资收益+公允价值变动+减值+其他收益+资产处置等净额的程序合并残差。
+    """
     rev = _g(fin, "income", "revenue")
-    parts = {
+    parts: dict[str, float | None] = {
         "成本": _g(fin, "income", "cogs"),
         "税金及附加": _g(fin, "income", "taxes_surcharges"),
         "销售费用": _g(fin, "income", "selling_exp"),
         "管理费用": _g(fin, "income", "admin_exp"),
         "研发费用": _g(fin, "income", "rd_exp"),
         "财务费用": _g(fin, "income", "fin_exp"),
-        "其他损益": None,  # 其他收益+投资收益+公允价值变动+减值+处置等净额，程序合并
-        "净利润": _g(fin, "income", "net_profit_parent"),
+        "其他损益": None,  # 程序合并残差，见下
+        "营业外收支": None,  # 利润总额 − 营业利润
+        "所得税": _g(fin, "income", "income_tax"),
+        "少数股东损益": _g(fin, "income", "minority_profit"),
+        "归母净利润": _g(fin, "income", "net_profit_parent"),
     }
-    other = None
     op = _g(fin, "income", "operating_profit")
+    tp = _g(fin, "income", "total_profit")
+    if tp is not None and op is not None:
+        parts["营业外收支"] = tp - op
     listed = [rev, parts["成本"], parts["税金及附加"], parts["销售费用"], parts["管理费用"], parts["研发费用"], parts["财务费用"]]
     nums: list[float] = []
     for v in listed:
@@ -137,11 +152,34 @@ def pie_split(fin: _FIN) -> dict[str, float | None]:
         nums.append(v)
     if op is not None and len(nums) == len(listed):
         # 其他损益 = 营业利润 − (收入 − 成本 − 税金及附加 − 销售 − 管理 − 研发 − 财务费用)
-        other = op - (nums[0] - sum(nums[1:]))
-    parts["其他损益"] = other
+        parts["其他损益"] = op - (nums[0] - sum(nums[1:]))
     if not rev:
         return {k: None for k in parts}
     return {k: (v / rev * 100 if v is not None else None) for k, v in parts.items()}
+
+
+def expense_ratios(fin: _FIN) -> dict[str, float | None]:
+    """成本费用率：各项占收入比（课程「纵向找突变」的信号源：成本率、费用率突变是盈余操纵的留痕）。"""
+    rev = _g(fin, "income", "revenue")
+    return {
+        "成本率": _div(_g(fin, "income", "cogs"), rev),
+        "销售费用率": _div(_g(fin, "income", "selling_exp"), rev),
+        "管理费用率": _div(_g(fin, "income", "admin_exp"), rev),
+        "研发费用率": _div(_g(fin, "income", "rd_exp"), rev),
+        "财务费用率": _div(_g(fin, "income", "fin_exp"), rev),
+    }
+
+
+def financial_income_share(fin: _FIN) -> float | None:
+    """财务性损益占净利润比 =（投资收益 + 公允价值变动收益）÷ 归母净利润。
+
+    课程口径：财务性损益靠天吃饭，占比高则利润质量需打折（如航空公司汇兑损益占净利润超三成）。
+    """
+    inv = _g(fin, "income", "invest_income")
+    fv = _g(fin, "income", "fv_change_income")
+    if inv is None or fv is None:
+        return None
+    return _div(inv + fv, _g(fin, "income", "net_profit_parent"))
 
 
 def cash_check(fin: _FIN) -> dict[str, float | None]:
@@ -170,6 +208,8 @@ def one_yuan_test(series: _SERIES, year: int, window: int = 3) -> float | None:
     """一元检验（PRD:36-37，整体股东口径）：窗口内每留存 1 元利润变成多少归母净资产。
 
     Δ归母净资产 ÷ Σ(归母净利润 − 分红)。留存利润应当通过一元检验。
+    注意：Δ归母净资产同样受增发、回购与其他综合收益影响，比值明显大于 1 时先查
+    是否有增发或公允价值重估，不能直接当作留存资本的高回报。
     """
     years = [y for y in range(year - window + 1, year + 1) if y in series]
     if len(years) < 2:
