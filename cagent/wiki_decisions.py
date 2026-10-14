@@ -151,7 +151,7 @@ def gen_decisions(agent: Agent, stock: str, market: str, root: Path) -> str:
         rows.append(f"| {year} | {_cell(judge)} | {_cell(decide)} |")
 
     header = "| 年份 | 管理层对行业大环境的判断 | 当年的重大经营决策 |\n| --- | --- | --- |"
-    return header + "\n" + "\n".join(rows) + "\n"
+    return "# 历年经营决策\n" + header + "\n" + "\n".join(rows) + "\n"
 
 
 def main() -> None:
@@ -181,7 +181,7 @@ def main() -> None:
 
     if args.render:
         html_output_path = output_dir / "decisions.html"
-        html_output_path.write_text(render_doc(doc, title=f"{args.stock} · 历年经营决策", ticker=args.stock, layout="decisions"), encoding="utf-8")
+        html_output_path.write_text(render_doc([doc], title=f"{args.stock} · 历年经营决策", ticker=args.stock), encoding="utf-8")
         logger.info(f"渲染: {html_output_path}")
 
 

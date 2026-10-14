@@ -104,7 +104,7 @@ def gen_business(agent: Agent, stock: str, market: str, root: Path) -> str:
     if not intro.strip() :
         raise ValueError(f"{stock} {market} business 分析异常")
 
-    return intro
+    return "# 生意模式\n" + intro
 
 
 def main() -> None:
@@ -134,7 +134,7 @@ def main() -> None:
 
     if args.render:
         html_output_path = output_dir / "business.html"
-        html_output_path.write_text(render_doc(doc, title=f"{args.stock} · 生意模式", ticker=args.stock), encoding="utf-8")
+        html_output_path.write_text(render_doc([doc], title=f"{args.stock} · 生意模式", ticker=args.stock), encoding="utf-8")
         logger.info(f"渲染: {html_output_path}")
 
 

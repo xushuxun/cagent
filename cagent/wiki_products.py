@@ -83,7 +83,7 @@ def gen_products(agent: Agent, stock: str, market: str, root: Path) -> str:
             raise ValueError(f"{year} products 分析异常")
 
         sections.append(f"#### {year}\n\n{table.strip()}")
-    return "\n\n".join(sections) + "\n"
+    return "# 产品与销量\n" + "\n\n".join(sections) + "\n"
 
 
 def main() -> None:
@@ -113,7 +113,7 @@ def main() -> None:
 
     if args.render:
         html_output_path = output_dir / "products.html"
-        html_output_path.write_text(render_doc(doc, title=f"{args.stock} · 产品与销量", ticker=args.stock, layout="columns"), encoding="utf-8")
+        html_output_path.write_text(render_doc([doc], title=f"{args.stock} · 产品与销量", ticker=args.stock), encoding="utf-8")
         logger.info(f"渲染: {html_output_path}")
 
 

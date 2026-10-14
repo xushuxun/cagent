@@ -21,11 +21,11 @@ from cagent.wiki_render import render_doc
 
 logger = logging.getLogger(__name__)
 
-# 模块顺序即页面栏目顺序
+# 模块顺序即页面栏目顺序；每个 gen 输出的 markdown 自带一级标题
 _MODULES = [
-    ("business", gen_business, "生意模式"),
-    ("products", gen_products, "产品与销量"),
-    ("decisions", gen_decisions, "历年经营决策"),
+    ("business", gen_business),
+    ("products", gen_products),
+    ("decisions", gen_decisions),
 ]
 
 
@@ -45,7 +45,7 @@ def main() -> None:
     agent = Agent(trace=True)
 
     docs = []
-    for name, gen, topic in _MODULES:
+    for name, gen in _MODULES:
         md_path = output_dir / f"{name}.md"
         if md_path.exists() and not args.force:
             doc = md_path.read_text(encoding="utf-8")
@@ -54,10 +54,9 @@ def main() -> None:
             logger.info(f"=== {name} ===")
             doc = gen(agent, args.stock, args.market, root)
             md_path.write_text(doc, encoding="utf-8")
-        docs.append(f"### {topic}\n\n{doc}")
+        docs.append(doc)
 
-    full_doc = "\n\n".join(docs)
-    html = render_doc(full_doc, title=f"{args.stock}.{args.market} · 公司研究", ticker=args.stock, layout="columns decisions")
+    html = render_doc(docs, title=f"{args.stock}.{args.market} · 公司研究", ticker=args.stock)
     html_path = output_dir / "index.html"
     html_path.write_text(html, encoding="utf-8")
     logger.info(f"渲染: {html_path}")

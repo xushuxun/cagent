@@ -15,153 +15,29 @@
   .copy-btn { margin-left:auto; font:12.5px inherit; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:5px 14px; cursor:pointer; }
   .copy-btn:hover { border-color:var(--accent); color:var(--accent); }
 
-  .layout { display:flex; max-width:1200px; margin:0 auto; }
-  aside { width:180px; flex:none; padding:20px 16px 40px 24px; position:sticky; top:41px; align-self:flex-start; }
-  aside .nav-title { font-size:11px; color:var(--mute); letter-spacing:.08em; margin-bottom:8px; }
-  aside a { display:block; color:var(--mute); text-decoration:none; font-size:13px; padding:3px 0 3px 10px; border-left:2px solid transparent; }
-  aside a:hover { color:var(--ink); }
-  aside a.sub { padding-left:22px; font-size:12.5px; }
-  aside a:target { color:var(--accent); border-left-color:var(--accent); }
-  main { flex:1; min-width:0; padding:16px 32px 60px 8px; max-width:920px; }
+  main { max-width:920px; margin:0 auto; padding:16px 32px 60px; }
 
-  h2 { font-size:16px; font-weight:600; margin:30px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--line); scroll-margin-top:56px; }
-  h2:first-child { margin-top:8px; }
-  h3 { font-size:15px; font-weight:600; margin:26px 0 8px; padding-bottom:5px; border-bottom:1px solid var(--line); scroll-margin-top:56px; }
-  h3:first-child { margin-top:8px; }
+  h1 { font-size:15px; font-weight:600; margin:26px 0 8px; padding-bottom:5px; border-bottom:1px solid var(--line); scroll-margin-top:56px; }
   h4 { font-size:13.5px; font-weight:600; margin:18px 0 6px; scroll-margin-top:56px; }
 
-  table { width:100%; border-collapse:collapse; font-size:13px; margin:6px 0 10px; }
-  th { text-align:left; font-weight:500; font-size:12px; color:var(--mute); border-bottom:1px solid var(--ink); padding:5px 8px 5px 0; white-space:nowrap; }
-  th:not(:first-child), td.n { text-align:right; padding-right:6px; }
-  td { border-bottom:1px solid var(--line); padding:5px 8px 5px 0; vertical-align:top; }
-  td.n { font-variant-numeric:tabular-nums; white-space:nowrap; }
-  td.q { color:#2c2a26; }
-  td.src, td .src { color:var(--mute); font-size:12px; white-space:nowrap; }
-  tr.hl td { background:var(--panel); }
-  .stats td:first-child { color:var(--mute); font-weight:400; }
-
-  main p { margin:8px 0; font-size:14px; text-align:justify; }
-  main ul, main ol { margin:6px 0 10px; padding-left:24px; }
-
-  .note { background:var(--panel); border-radius:6px; padding:8px 12px; margin:10px 0; color:var(--mute); font-size:12.5px; }
-  .note b { color:var(--ink); font-variant-numeric:tabular-nums; }
-
-  /* columns 版式：年份并排分栏，对齐原型「产品与销量」 */
-  .columns .years { display:flex; gap:14px; align-items:flex-start; margin:10px 0; }
-  .columns .year { flex:1; min-width:0; }
-  .columns .year > b { display:block; font-size:12.5px; color:var(--mute); font-weight:600; border-bottom:1px solid var(--ink); padding-bottom:3px; margin-bottom:2px; }
-  .columns .year table { margin:0; font-size:12.5px; table-layout:fixed; }
-  .columns .year th { padding:3px 4px 3px 0; white-space:normal; word-break:break-all; }
-  .columns .year td { padding:3px 4px 3px 0; word-break:break-all; }
-  .columns .year th:first-child, .columns .year td:first-child { width:60%; }
-  .columns .year th:last-child, .columns .year td:last-child { width:40%; white-space:nowrap; text-align:right; font-variant-numeric:tabular-nums; overflow:hidden; }
-  .columns .year p { margin:4px 0 0; font-size:12px; color:var(--mute); text-align:left; }
-
-  @media (max-width:860px) {
-    aside { display:none; }
-    main { padding-left:32px; }
-    .columns .years { flex-wrap:wrap; }
-    .columns .year { flex:1 1 40%; }
-  }
-  /* decisions 版式：仅作用于容器的直接子表（年份列窄、右对齐，判断/决策两列定宽平衡） */
-  .decisions > table { table-layout:fixed; font-size:13px; }
-  .decisions > table th, .decisions > table td { padding:7px 10px 7px 0; line-height:1.75; }
-  .decisions > table th:first-child, .decisions > table td:first-child { width:48px; white-space:nowrap; text-align:right; font-variant-numeric:tabular-nums; color:var(--mute); padding-right:8px; }
-  .decisions > table td:nth-child(2) { width:44%; color:#2c2a26; }
-  .decisions > table tr:last-child td { border-bottom:none; }
+  .mod p { margin:8px 0; font-size:14px; text-align:justify; }
+  .mod ul, .mod ol { margin:6px 0 10px; padding-left:24px; }
+  .mod table { width:100%; border-collapse:collapse; font-size:13px; margin:6px 0 10px; }
+  .mod th { text-align:left; font-weight:500; font-size:12px; color:var(--mute); border-bottom:1px solid var(--ink); padding:5px 8px 5px 0; }
+  .mod td { border-bottom:1px solid var(--line); padding:5px 8px 5px 0; vertical-align:top; }
 </style>
 </head>
 <body>
 
 <div class="topbar"><b>{{ title }}</b><span>{{ ticker }}</span><button class="copy-btn" onclick="copyReport(this)">复制全文与估值 Prompt</button></div>
 
-<div class="layout">
-<aside>
-  <div class="nav-title">目录</div>
-  <nav id="toc"></nav>
-</aside>
 <main>
-<div id="doc" class="doc {{ layout }}">
-<script type="text/markdown" id="md">
-{{ doc }}
-</script>
-</div>
+{{ body }}
 </main>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script>
-var doc = document.getElementById('doc');
-doc.innerHTML = marked.parse(document.getElementById('md').textContent.trim());
-
-// columns 版式：纯年份标题（#### 2021）与其后的表格、口径注合成一栏；只作用于本容器
-if (doc.classList.contains('columns')) {
-  var years = document.createElement('div');
-  years.className = 'years';
-  var year = null, anchor = null;
-  Array.prototype.slice.call(doc.children).forEach(function (el) {
-    if (el.tagName === 'H4' && /^\d{4}$/.test(el.textContent.trim())) {
-      year = document.createElement('div');
-      year.className = 'year';
-      var b = document.createElement('b');
-      b.textContent = el.textContent.trim();
-      year.appendChild(b);
-      years.appendChild(year);
-      el.remove();
-    } else if (/^H[1-4]$/.test(el.tagName)) {
-      if (year) anchor = el; // 任意更高级标题都关闭分栏：记录结束位置，分栏整体插回原处
-      year = null;
-    } else if (year) {
-      year.appendChild(el);
-    }
-  });
-  if (years.children.length) doc.insertBefore(years, anchor); // anchor 为 null 时等同 append
-}
-
-// 目录：h3 为栏目、h4 为小节，锚点与链接前端生成
-var toc = document.getElementById('toc');
-Array.prototype.slice.call(doc.children).forEach(function (el) {
-  if (el.tagName !== 'H3' && el.tagName !== 'H4') return;
-  if (el.closest('.years')) return; // 分栏内的年份标题不进目录
-  var id = 'toc-' + toc.children.length;
-  el.id = id;
-  var a = document.createElement('a');
-  a.href = '#' + id;
-  a.textContent = el.textContent.trim();
-  if (el.tagName === 'H4') a.className = 'sub';
-  toc.appendChild(a);
-});
-</script>
 
 <script>
-var VALUATION_PROMPT = [
-  '以下是一家中国上市公司的研究报告全文（历年年报合并口径，单位：亿元人民币），只陈列数据，不含估值结论。',
-  '请用巴菲特、芒格、李录的价值投资框架为其估值：取正常化利润并说明口径与周期位置；按 10% 左右资本成本折算；加净现金类资产（请依年报资产负债表自行计算）；只有增量资本回报持续高于资本成本时才为成长付费。给出区间而非单点，估值是假设下的推演，不是结论。',
-  '—— 报告全文 ——'
-].join('\n');
-
-function reportText() {
-  var doc = document.getElementById('doc');
-  var out = [document.querySelector('.topbar b').textContent.trim()];
-  doc.querySelectorAll(':scope > *').forEach(function (el) {
-    if (el.tagName === 'H2') { out.push('\n## ' + el.textContent.trim()); }
-    else if (el.tagName === 'H3') { out.push('\n### ' + el.textContent.trim()); }
-    else if (el.tagName === 'TABLE') {
-      el.querySelectorAll('tr').forEach(function (tr) {
-        var cells = Array.prototype.map.call(tr.querySelectorAll('th,td'), function (c) { return c.textContent.trim(); });
-        out.push(cells.join(' | '));
-      });
-    }
-    else {
-      var t = el.textContent.replace(/\s+/g, ' ').trim();
-      if (t) out.push(t);
-    }
-  });
-  return out.join('\n');
-}
-
+var COPY_TEXT = {{ copy_json }};
 function copyReport(btn) {
-  var text = VALUATION_PROMPT + '\n\n' + reportText();
   function done() {
     var old = btn.textContent;
     btn.textContent = '已复制';
@@ -169,12 +45,12 @@ function copyReport(btn) {
   }
   function fallback() {
     var ta = document.createElement('textarea');
-    ta.value = text; document.body.appendChild(ta); ta.select();
+    ta.value = COPY_TEXT; document.body.appendChild(ta); ta.select();
     try { document.execCommand('copy'); done(); } catch (e) {}
     document.body.removeChild(ta);
   }
   if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(text).then(done, fallback);
+    navigator.clipboard.writeText(COPY_TEXT).then(done, fallback);
   } else { fallback(); }
 }
 </script>
