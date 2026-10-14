@@ -104,7 +104,7 @@ def gen_business(agent: Agent, stock: str, market: str, root: Path) -> str:
     if not intro.strip() :
         raise ValueError(f"{stock} {market} business 分析异常")
 
-    return "# 生意模式\n" + intro
+    return "# 生意模式\n\n" + intro
 
 
 def main() -> None:

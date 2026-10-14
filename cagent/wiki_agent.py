@@ -16,6 +16,7 @@ from pathlib import Path
 from cagent.agent import Agent
 from cagent.wiki_business import gen_business
 from cagent.wiki_decisions import gen_decisions
+from cagent.wiki_finance import gen_finance
 from cagent.wiki_products import gen_products
 from cagent.wiki_render import render_doc
 
@@ -26,6 +27,7 @@ _MODULES = [
     ("business", gen_business),
     ("products", gen_products),
     ("decisions", gen_decisions),
+    ("finance", gen_finance),
 ]
 
 

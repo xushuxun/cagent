@@ -151,7 +151,7 @@ def gen_decisions(agent: Agent, stock: str, market: str, root: Path) -> str:
         rows.append(f"| {year} | {_cell(judge)} | {_cell(decide)} |")
 
     header = "| 年份 | 管理层对行业大环境的判断 | 当年的重大经营决策 |\n| --- | --- | --- |"
-    return "# 历年经营决策\n" + header + "\n" + "\n".join(rows) + "\n"
+    return "# 历年经营决策\n\n" + header + "\n" + "\n".join(rows) + "\n"
 
 
 def main() -> None:

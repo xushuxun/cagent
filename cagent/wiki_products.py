@@ -83,7 +83,7 @@ def gen_products(agent: Agent, stock: str, market: str, root: Path) -> str:
             raise ValueError(f"{year} products 分析异常")
 
         sections.append(f"#### {year}\n\n{table.strip()}")
-    return "# 产品与销量\n" + "\n\n".join(sections) + "\n"
+    return "# 产品与销量\n\n" + "\n\n".join(sections) + "\n"
 
 
 def main() -> None:
