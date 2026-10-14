@@ -70,17 +70,19 @@ class Agent:
         for chunk in chunks:
             message = textwrap.dedent(f"""
                 {prompt}
-                <rule>
-                目前已经整理好的结果在 <current-result>，把 <chunk> 里的信息合并进来并重新整理，不要重复，删除冲突部分；
-                需要更新结果时 updated=true，返回新的result；
-                结果不需要更新时 updated=false, result留空
-                </rule>
+
+                <reduce-rule>
+                    目前已经整理好的结果在 <current-result>，把 <chunk> 里的信息合并进来并重新整理，不要重复，删除冲突部分；
+                    需要更新结果时 updated=true，返回新的result；
+                    结果不需要更新时 updated=false, result留空
+                </reduce-rule>
+
                 <current-result>
-                {result}
+                    {result}
                 </current-result>
 
                 <chunk>
-                {chunk}
+                    {chunk}
                 </chunk>""").strip()
             resp = self.chat_json(
                 message,
@@ -96,3 +98,7 @@ class Agent:
             if resp.pop("updated", True) and resp.get("result", "").strip():
                 result = resp["result"]
         return result.strip()
+
+    def chat_reduce_chunks_loop_once(self, prompt: str, chunks: list[str]) -> str:
+        result = self.chat_reduce_chunks(prompt, chunks)
+        return self.chat_reduce_chunks(prompt, chunks, result)

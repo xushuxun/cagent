@@ -57,7 +57,7 @@ def main() -> None:
         docs.append(f"### {topic}\n\n{doc}")
 
     full_doc = "\n\n".join(docs)
-    html = render_doc(full_doc, title=f"{args.stock} · 公司研究", ticker=args.stock, layout="columns decisions")
+    html = render_doc(full_doc, title=f"{args.stock}.{args.market} · 公司研究", ticker=args.stock, layout="columns decisions")
     html_path = output_dir / "index.html"
     html_path.write_text(html, encoding="utf-8")
     logger.info(f"渲染: {html_path}")

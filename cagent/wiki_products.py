@@ -56,11 +56,12 @@ def gen_products(agent: Agent, stock: str, market: str, root: Path) -> str:
     md_by_year = {report_year(agent, p): p for p in mds}
 
     sections = []
-    for year, md_path in sorted(md_by_year.items()):
+    for year, md_path in sorted(md_by_year.items())[-5:]:
         toc = Toc(agent, md_path)
         logger.info(f"阅读: {md_path.name}")
 
-        picked = toc.pick_chapters(toc.chapters,  "你在阅读一份上市公司年报的目录。获取公司的产品服务以及销量，需要阅读哪些章节？不要看财务报表")
+        pick_task = "找出可能包含产品信息的章节，不要看财务报告"
+        picked = toc.pick_chapters(toc.chapters,  pick_task)
         logger.info(f"选中章节: {[toc.chapters[i]['title'] for i in picked]}")
         chunks = [chunk for i in picked for chunk in toc.chapter_text_chunk(i)]
 
