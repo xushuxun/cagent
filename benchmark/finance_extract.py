@@ -93,6 +93,14 @@ def selftest() -> int:
     return 1 if failures else 0
 
 
+def fields_from(artifact: dict) -> dict[str, float]:
+    """从各段的行汇总固定字段：与序列层同一规则（只认第一次出现的行，成组 role 相加）。"""
+    fields: dict[str, float] = {}
+    for segment in artifact.get("segments") or []:
+        fields.update(roles_from_rows(segment.get("rows") or [], unit=segment.get("unit") or "元"))
+    return fields
+
+
 def evaluate(case: dict, root: Path, tol: float) -> int:
     path = artifact_path(case, root)
     print(f"\n案例 {case['id']}（{case['year']}）")
@@ -102,7 +110,7 @@ def evaluate(case: dict, root: Path, tol: float) -> int:
         return 1
 
     artifact = json.loads(path.read_text(encoding="utf-8"))
-    roles = artifact.get("roles") or {}
+    roles = fields_from(artifact)
     checks = verify(roles)  # 按产物数字重算，不信任产物里存的结论
     counts = {status: sum(1 for c in checks if c.status == status) for status in ("pass", "fail", "skip", "diff")}
     print(f"  恒等式 pass {counts['pass']} / fail {counts['fail']} / skip {counts['skip']} / diff {counts['diff']}")

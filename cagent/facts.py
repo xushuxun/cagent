@@ -70,11 +70,12 @@ import logging
 import re
 import sys
 import textwrap
+from dataclasses import dataclass
 from pathlib import Path
 
 from cagent.checks import IDENTITIES, Check, check_report, rollforward_check, verbatim_check, verify
 from cagent.chunk import Toc, report_year, split_pages
-from cagent.fields import ROLES, ROLES_BY_KIND, duplicate_roles, number, roles_from_rows
+from cagent.fields import ROLES, ROLES_BY_KIND, UNIT_SCALE, duplicate_roles, number, roles_from_rows
 from cagent.llm import LLM
 from cagent.scraper.lakehouse_index import atomic_write
 
@@ -221,8 +222,9 @@ def _equity_prompt(tables_html: str) -> str:
         不是期间；两期数据是上下相接的两张表（本年金额一张、上年金额一张）。
 
         只提取两笔业务事项，行用四元数组 [原表行名, role, 本期数, 上期数]（本期取本年金额表、上期取上年金额表）：
-        - dividend：利润分配下「对股东的分配」行，取**未分配利润列**的绝对值（不是股东权益合计列）
-        - capital_raised：「所有者投入和减少资本」行，取归母权益小计列；表中没有小计列时取股东权益合计列
+        - dividend：利润分配下「对股东的分配」行，取**未分配利润列**的金额，写成正数（等式里按减项用；不是股东权益合计列）
+        - capital_raised：「所有者投入和减少资本」行，取归母权益小计列；表中没有小计列时取股东权益合计列。
+          这一项照原表符号抄：增资为正、回购或减少资本为负
 
         - 抄录原表数值，禁止计算、禁止改数；千分位逗号去掉，括号负数改成负号
         - unit 照抄原表单位；两项都找不到就不输出行
@@ -351,9 +353,10 @@ def _tables_html(inventory: list[dict], ids: list[str]) -> str:
     return "\n\n".join(parts)
 
 
-def extract_kind(agent: LLM, kind: str, inventory: list[dict], ids: list[str], attempts: int = 3) -> tuple[dict | None, list[Check]]:
+def extract_kind(agent: LLM, kind: str, inventory: list[dict], ids: list[str], attempts: int = 3, passes: int = 2) -> tuple[dict | None, list[Check]]:
     """抽一张表并反复校验：校验驱动的收敛，只在变好时采纳。
 
+    模型有随机性：一轮收敛没成功时，整段重抄一遍（带上上一遍的失败反馈）比在同一份结果上继续打补丁更有用。
     权益变动表只提两笔事实、且要靠利润表与资产负债表的数才能校验，故不走这张表的收敛循环，
     残差在跨表校验里报。
     """
@@ -364,19 +367,33 @@ def extract_kind(agent: LLM, kind: str, inventory: list[dict], ids: list[str], a
     if kind == "equity":
         return table, []
 
-    task = agent.task(_statement_prefix(kind, html))
-
-    def tail(previous: dict | None, feedback: str) -> str:
-        return _extract_tail() if previous is None else _repair_tail(previous, feedback)
-
     def check(value: dict) -> tuple[int, str]:
         return segment_feedback(kind, value)
 
-    table, score, feedback = task.converge(tail, parse=lambda raw, previous: _merge_candidate(previous, json.loads(raw)), check=check,
-                                           schema=lambda round_no, previous: _extract_schema() if previous is None else _patch_schema(),
-                                           attempts=attempts)
-    if table is None:
+    best: tuple[dict, int, str] | None = None
+    carried = ""
+    for pass_no in range(1, passes + 1):
+        prefix = _statement_prefix(kind, html) + (f"\n\n<previous-attempt>\n上一遍抄的结果过不了校验：{carried}\n请重新逐行核对原表。\n</previous-attempt>" if carried else "")
+        task = agent.task(prefix)
+
+        def tail(previous: dict | None, feedback: str) -> str:
+            return _extract_tail() if previous is None else _repair_tail(previous, feedback)
+
+        table, score, feedback = task.converge(tail, parse=lambda raw, previous: _merge_candidate(previous, json.loads(raw)), check=check,
+                                               schema=lambda round_no, previous: _extract_schema() if previous is None else _patch_schema(),
+                                               attempts=attempts)
+        if table is None:
+            continue
+        if best is None or score < best[1]:
+            best = (table, score, feedback)
+        if score == 0:
+            logger.info(f"{kind}：第 {pass_no} 遍收敛")
+            break
+        carried = feedback[:300]
+        logger.warning(f"{kind}：第 {pass_no} 遍未收敛（分数 {score}），重抄一遍")
+    if best is None:
         return None, []
+    table, score, feedback = best
     roles = roles_from_rows(table["rows"], unit=table.get("unit") or "元")
     if score > 0:
         logger.warning(f"{kind} 收敛未完成（分数 {score}）：{feedback.splitlines()[0] if feedback else ''}")
@@ -436,7 +453,7 @@ def extract_notes(agent: LLM, toc: Toc, known_roles: dict[str, float] | None = N
     for anchor in _NOTES_ANCHORS:
         hits = [index for index, chunk in enumerate(chunks) if anchor in chunk]
         anchored += [index for index in hits[:2] if index not in choices and index not in anchored]
-    selected = [chunks[i] for i in choices] + [chunks[i] for i in anchored]
+    selected = _fit_chunks(agent, [chunks[i] for i in choices] + [chunks[i] for i in anchored])
     logger.info(f"附注：章节 {[toc.chapters[i]['title'] for i in picked]} / 片段 {len(chunks)} → 模型选 {choices} + 锚点 {anchored}")
     if not selected:
         logger.warning("附注检索不到相关片段")
@@ -499,7 +516,169 @@ def extract_notes(agent: LLM, toc: Toc, known_roles: dict[str, float] | None = N
     return table, checks
 
 
-def extract_financials(agent: LLM, md_path: str | Path, root: Path, market: str = "", stock: str = "", kinds: tuple[str, ...] = _ALL_KINDS, base: dict | None = None) -> dict:
+@dataclass(frozen=True)
+class DetailNeed:
+    """一项按需明细：要什么、去哪儿找、检索关键词。
+
+    明细不做字段映射（行名照原文），所以"要什么"由需要它的那个问题定义，不是全局词表。
+    """
+
+    id: str
+    title: str
+    instruction: str
+    anchors: tuple[str, ...]
+
+
+DETAIL_NEEDS: tuple[DetailNeed, ...] = (
+    DetailNeed(
+        id="transfer",
+        title="资产怎么变成费用：折旧摊销、计提减值、转固、核销",
+        instruction=(
+            "列出本期与上期这些转化事实：固定资产折旧、无形资产摊销、使用权资产折旧、长期待摊费用摊销；"
+            "各项资产减值准备的本期计提额与转回/转销额；在建工程转入固定资产的金额；"
+            "应收账款坏账准备的计提与核销金额。行名照原文。"
+        ),
+        anchors=("累计折旧", "减值准备", "本期计提", "在建工程", "转入固定资产", "核销", "摊销"),
+    ),
+    DetailNeed(
+        id="obligation",
+        title="没入表的义务：对外担保、未决诉讼、承诺、衍生品、受限资产",
+        instruction=(
+            "列出这些表外义务的金额与对象：对外担保余额（含对子公司的担保）、作为被告的未决诉讼标的金额、"
+            "已签约未拨备的重大承诺（购建长期资产、对外投资）、衍生金融资产与负债的期末公允价值、"
+            "使用受限的货币资金与其他受限资产。行名照原文，金额照抄。"
+        ),
+        anchors=("对外担保", "担保总额", "未决诉讼", "重大承诺", "衍生金融", "所有权受到限制"),
+    ),
+    DetailNeed(
+        id="related",
+        title="占着资本不产出的资产：其他应收款与大额占款",
+        instruction=(
+            "列出其他应收款的构成：按对象或性质列示的余额较大的几项（如关联方往来、押金保证金、备用金、代垫款），"
+            "以及账龄较长的部分；再列出资产端金额明显偏大但与主业无关的项目（如闲置资产、待处置资产）。行名照原文。"
+        ),
+        anchors=("其他应收款", "账龄", "关联方", "押金", "保证金", "闲置"),
+    ),
+)
+DETAIL_NEED_BY_ID = {need.id: need for need in DETAIL_NEEDS}
+
+
+def _fit_chunks(llm: LLM, chunks: list[str], reserve_tokens: int = 6144) -> list[str]:
+    """按上下文预算取片段：prefill 可以奢侈，但不能把上下文撑爆。
+
+    预算按字符估（1 token ≈ 1.6 字符），装不下的片段直接跳过而不是截断——截断的原文比没有更危险。
+    """
+    budget_chars = max(4096, int((llm.n_ctx() - reserve_tokens) * 1.6))
+    picked, used = [], 0
+    for chunk in chunks:
+        if used + len(chunk) > budget_chars:
+            continue
+        picked.append(chunk)
+        used += len(chunk)
+    logger.info(f"片段预算 {budget_chars:,} 字符：取 {len(picked)}/{len(chunks)} 段（{used:,} 字符）")
+    return picked
+
+
+def _detail_schema() -> dict:
+    """明细行：[行名, 本期数, 上期数, 页码]——不做 role 映射，页码随行带出。"""
+    return {
+        "type": "object",
+        "properties": {
+            "unit": {"type": "string"},
+            "pages": {"type": "array", "items": {"type": "integer"}},
+            "rows": {"type": "array", "items": {"type": "array", "items": {"type": ["string", "number", "null"]}}},
+        },
+        "required": ["unit", "pages", "rows"],
+    }
+
+
+def extract_details(agent: LLM, toc: Toc, need: DetailNeed, *, attempts: int = 2, limit: int = 20) -> dict:
+    """按需明细：检索片段 → 抄成 [行名, 本期, 上期, 页码] → 逐字校验（数字必须在片段里出现）。
+
+    不做字段映射，所以只验"数是不是原文里的"；页码允许落在片段页码集合内。
+    """
+    try:
+        picked = sorted(set(toc.pick_chapters(toc.chapters, need.title)))
+    except ValueError:
+        logger.warning(f"明细 {need.id}：章节定位失败")
+        return {}
+    chunks = [chunk for index in picked for chunk in toc.chapter_text_chunk(index, budget=6144)]
+    hits = [chunk for chunk in chunks if any(anchor in chunk for anchor in need.anchors)]
+    ordered = hits + [chunk for chunk in chunks if chunk not in hits]
+    selected = _fit_chunks(agent, ordered)
+    if not selected:
+        logger.warning(f"明细 {need.id}：检索不到相关片段")
+        return {}
+    html = "\n\n".join(selected)
+    logger.info(f"明细 {need.id}：片段 {len(chunks)} → 选中 {len(selected)}")
+
+    prefix = textwrap.dedent(f"""
+        <requirement>
+        你在读年报附注，只列出下面这一类事实。只抄原文写明的数，禁止计算、禁止估算、禁止改数。
+
+        - 行用四元数组：[原表行名, 本期数, 上期数, 页码]（页码是正文 <!-- page N --> 标记的页号）
+        - 行名照原文，不要归纳、不要改写成通用名称；原文没有的行不要编，没有上期数就填 null
+        - 千分位逗号去掉，括号负数改成负号；unit 照抄原表单位（元/千元/百万元）
+        - 最多 12 行，优先金额大的、与这一类直接相关的
+        </requirement>
+
+        <need>
+        {need.title}
+        {need.instruction}
+        </need>
+
+        <segments>
+        {html}
+        </segments>""").strip()
+
+    task = agent.task(prefix)
+
+    def tail(_previous: dict | None, feedback: str) -> str:
+        if not feedback:
+            return "<task>按四元数组列出这一类事实。</task>"
+        return f"<violations>\n上一稿里这些数不在上面的原文里，或页码不对：{feedback}\n只许抄原文有的数重列一遍。\n</violations>"
+
+    def check(value: dict) -> tuple[int, str]:
+        outside = verbatim_check(need.id, {"rows": value.get("rows") or []}, html)
+        pages = {int(match) for match in re.findall(r"<!-- page (\d+) -->", html)}
+        rows = value.get("rows") or []
+        bad_pages = [str(int(row["page"])) for row in rows if row.get("page") and pages and int(row["page"]) not in pages]
+        no_page = [str(row.get("label")) for row in rows if not row.get("page")]
+        problems = list(outside.missing)
+        if bad_pages:
+            problems.append(f"页码不在片段内：{'、'.join(bad_pages[:3])}")
+        if no_page:
+            problems.append(f"这些行没给页码：{'、'.join(no_page[:3])}")
+        return len(problems), "；".join(problems)
+
+    def parse(raw: str, _previous: dict | None) -> dict:
+        payload = json.loads(raw)
+        rows = []
+        for cells in payload.get("rows") or []:
+            cells = list(cells) + [None] * (4 - len(cells))
+            rows.append({"label": str(cells[0] or "").strip(), "values": [number(cells[1]), number(cells[2])], "page": number(cells[3])})
+        return {"unit": payload.get("unit") or "元", "pages": payload.get("pages") or [], "rows": [row for row in rows if row["label"]]}
+
+    table, score, feedback = task.converge(tail, parse=parse, check=check, schema=_detail_schema(), max_tokens=1024, attempts=attempts)
+    if table is None:
+        return {}
+    if score > 0:
+        logger.warning(f"明细 {need.id} 仍有 {score} 处没对上：{feedback[:120]}")
+    table["need"] = need.id
+    table["title"] = need.title
+    return table
+
+
+def extract_financials(
+    agent: LLM,
+    md_path: str | Path,
+    root: Path,
+    market: str = "",
+    stock: str = "",
+    kinds: tuple[str, ...] = _ALL_KINDS,
+    base: dict | None = None,
+    details: tuple[str, ...] = (),
+) -> dict:
     """一份年报 md → financials.json，返回解析后的 dict。
 
     kinds 限定只重取哪几张表（迭代单张表用）；base 是已有产物，未重取的表与恒等式结论沿用。
@@ -519,7 +698,7 @@ def extract_financials(agent: LLM, md_path: str | Path, root: Path, market: str 
     picked_tables = (base or {}).get("source", {}).get("picked") or pick_tables(agent, inventory)
     logger.info(f"选中: {{{', '.join(f'{k}: {v}' for k, v in picked_tables.items())}}}")
 
-    tables: dict[str, dict] = {kind: table for kind, table in (base or {}).get("tables", {}).items() if kind not in kinds}
+    segments: list[dict] = [segment for segment in (base or {}).get("segments") or [] if segment.get("kind") not in kinds]
     # 沿用旧结论时，必须把这一轮重取的 kind 相关结论全部丢掉，否则上一轮的 fail 会一直挂着
     def check_kind(check_id: str) -> str | None:
         parts = check_id.split(".")
@@ -527,7 +706,7 @@ def extract_financials(agent: LLM, md_path: str | Path, root: Path, market: str 
 
     all_checks: list[Check] = [
         Check(**check)
-        for check in (base or {}).get("identities", [])
+        for check in (base or {}).get("checks", [])
         if check_kind(check["id"]) not in kinds and not check["id"].startswith(("cross", "equity"))
     ]
     for kind in [k for k in kinds if k != NOTES]:
@@ -538,7 +717,7 @@ def extract_financials(agent: LLM, md_path: str | Path, root: Path, market: str 
         table, checks = extract_kind(agent, kind, inventory, ids)
         if table is None:
             continue
-        tables[kind] = table
+        segments.append({**table, "kind": kind})
         checks = [*checks, _consolidated_check(kind, table), verbatim_check(kind, table, report_text)]
         all_checks.extend(checks)
         rows = table.get("rows") or []
@@ -550,18 +729,46 @@ def extract_financials(agent: LLM, md_path: str | Path, root: Path, market: str 
     if NOTES in kinds:
         logger.info("附注事实 …")
         statement_roles: dict[str, float] = {}
-        for statement in tables.values():
+        for statement in segments:
             statement_roles.update(roles_from_rows(statement.get("rows") or [], unit=statement.get("unit") or "元"))
         notes_table, notes_checks = extract_notes(agent, toc, statement_roles)
         if notes_table is not None:
-            tables[NOTES] = notes_table
+            segments.append({**notes_table, "kind": NOTES})
             all_checks.extend([*notes_checks, verbatim_check(NOTES, notes_table, report_text)])
             rows = notes_table.get("rows") or []
             logger.info(f"{NOTES}: {len(rows)} 行, {len(roles_from_rows(rows, unit=notes_table.get('unit') or '元'))} 个 role\n{check_report(notes_checks)}")
 
+    if details:
+        detail_rows = list((base or {}).get("details") or [])
+        for need_id in details:
+            need = DETAIL_NEED_BY_ID.get(need_id)
+            if need is None:
+                logger.warning(f"没有这项按需明细：{need_id}")
+                continue
+            logger.info(f"按需明细：{need.title} …")
+            table = extract_details(agent, toc, need)
+            if not table:
+                continue
+            unit = table.get("unit") or "元"
+            scale = UNIT_SCALE.get(unit.strip(), 1.0)
+            detail_rows = [row for row in detail_rows if row.get("kind") != need_id]
+            for row in table["rows"]:
+                values = row.get("values") or [None, None]
+                detail_rows.append(
+                    {
+                        "label": row["label"],
+                        "value": (values[0] * scale) if values[0] is not None else None,
+                        "prev": (values[1] * scale) if len(values) > 1 and values[1] is not None else None,
+                        "kind": need_id,
+                        "title": need.title,
+                        "page": int(row["page"]) if row.get("page") else None,
+                    }
+                )
+            logger.info(f"明细 {need_id}：{len(table['rows'])} 行")
+
     roles: dict[str, float] = {}
     roles_prior: dict[str, float] = {}
-    for table in tables.values():
+    for table in segments:
         rows = table.get("rows") or []
         unit = table.get("unit") or "元"
         roles.update(roles_from_rows(rows, unit=unit))
@@ -577,15 +784,14 @@ def extract_financials(agent: LLM, md_path: str | Path, root: Path, market: str 
             "market": market,
             "stock": stock,
             "file": md_path.name,
-            "pages": {kind: table.get("pages") for kind, table in tables.items()},
+            "pages": {segment["kind"]: segment.get("pages") for segment in segments},
             "picked": picked_tables,
         },
-        "unit": next((table.get("unit") for table in tables.values() if table.get("unit")), "元"),
-        "tables": tables,
-        "roles": roles,
-        "roles_prior": roles_prior,
-        "identities": [check.__dict__ for check in all_checks],
+        "unit": next((segment.get("unit") for segment in segments if segment.get("unit")), "元"),
+        "segments": segments,
+        "checks": [check.__dict__ for check in all_checks],
         "unresolved": unresolved,
+        "details": detail_rows if details else (base or {}).get("details") or [],
     }
     logger.info(f"跨表校验:\n{check_report(cross_checks)}")
     return financials
@@ -598,6 +804,7 @@ def main() -> None:
     parser.add_argument("--market", default="cn", choices=["cn", "hk"])
     parser.add_argument("--root", default=str(Path(__file__).resolve().parents[1] / ".cagent"))
     parser.add_argument("--force", action="store_true", help="重取已存在的 financials.json")
+    parser.add_argument("--details", default="", help="按需明细，逗号分隔（transfer/obligation/related）；空则不抽")
     parser.add_argument("--kind", action="append", choices=_ALL_KINDS, help="只重取某几张表（可重复），其余沿用已有产物")
     args = parser.parse_args()
 

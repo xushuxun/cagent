@@ -15,6 +15,8 @@ import re
 import sys
 from pathlib import Path
 
+from cagent.checks import allowed_numbers, numbers_in, on_evidence
+
 CASES_PATH = Path(__file__).parent / "cases" / "finance_analysis.json"
 DEFAULT_OUTPUT = Path(__file__).resolve().parents[1] / "output" / "wiki"
 DEFAULT_ROOT = Path(__file__).resolve().parents[1] / ".cagent"
@@ -24,34 +26,6 @@ _PAGE_CITE = re.compile(r"p\.\s?(\d+)")
 _YEAR = re.compile(r"(?:19|20)\d{2}")
 _NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
 _SECTIONS = ("## 一、数据", "## 二、资本回报拆解")
-
-
-def numbers_in(text: str) -> list[tuple[str, int]]:
-    """文本里的数字 → [(原样, 小数位数)]；先摘掉页码引用与年份，它们不是数据声明。"""
-    cleaned = _PAGE_MARK.sub(" ", text)
-    cleaned = _PAGE_CITE.sub(" ", cleaned)
-    cleaned = _YEAR.sub(" ", cleaned)
-    cleaned = re.sub(r"(?m)^\s*\d+[.、)]\s", " ", cleaned)  # 列表序号
-    found = []
-    for token in _NUMBER.findall(cleaned):
-        digits = token.split(".")[1] if "." in token else ""
-        found.append((token, len(digits)))
-    return found
-
-
-def matches(value: float, decimals: int, allowed: set[float], tol: float) -> bool:
-    """正文数字是否落在证据表某个数上（按正文写到的小数位取整比对）。"""
-    for candidate in allowed:
-        if abs(candidate - value) <= max(tol, 0.5 * 10 ** (-decimals) + 1e-9):
-            return True
-    return False
-
-
-def _allowed_numbers(evidence_text: str) -> set[float]:
-    allowed = set()
-    for token, _ in numbers_in(evidence_text):
-        allowed.add(float(token.replace(",", "")))
-    return allowed
 
 
 def selftest() -> int:
@@ -68,10 +42,10 @@ def selftest() -> int:
     expect("保留百分比", numbers_in("占比 18.1%"), [("18.1", 1)])
 
     allowed = {2228.2, 18.1, 403.6}
-    expect("同值命中", matches(2228.2, 1, allowed, 0.0), True)
-    expect("按小数位取整命中", matches(2228, 0, allowed, 0.0), True)
-    expect("自造数字不命中", matches(2229.5, 1, allowed, 0.0), False)
-    expect("外推数字不命中", matches(4.4, 1, allowed, 0.0), False)
+    expect("同值命中", on_evidence(2228.2, 1, allowed, tol=0.0), True)
+    expect("按小数位取整命中", on_evidence(2228, 0, allowed, tol=0.0), True)
+    expect("自造数字不命中", on_evidence(2229.5, 1, allowed, tol=0.0), False)
+    expect("外推数字不命中", on_evidence(4.4, 1, allowed, tol=0.0), False)
 
     print("离线自检：" + ("全部通过" if not failures else f"{len(failures)} 项失败"))
     for line in failures:
@@ -99,13 +73,13 @@ def evaluate(case: dict, output_root: Path, root: Path) -> int:
         problems.append(f"二级标题 {len(level2)} 个，期望 2")
 
     evidence_part, _, prose = doc.partition(_SECTIONS[1])
-    evidence_numbers = _allowed_numbers(evidence_part)
+    evidence_numbers = allowed_numbers(evidence_part)
 
     # 全篇数字只许来自证据表：模型自造、换算、外推、累加都会在这里露馅
     violations = []
     for token, decimals in numbers_in(prose):
         value = float(token.replace(",", ""))
-        if not matches(value, decimals, evidence_numbers, case.get("tol", 0.0)):
+        if not on_evidence(value, decimals, evidence_numbers, tol=case.get("tol", 0.0)):
             violations.append(token)
     limit = case.get("max_out_of_scope", 0)
     print(f"  证据表数字 {len(evidence_numbers)} 个；正文越界 {len(violations)} 个（允许 {limit}）")

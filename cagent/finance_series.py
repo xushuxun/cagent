@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 from cagent.checks import IDENTITIES
-from cagent.fields import DA_ROLES, ROLES, UNIT_SCALE
+from cagent.fields import DA_ROLES, ROLES, UNIT_SCALE, roles_from_rows
 
 _UNVERIFIED_ROLES = {identity.id: tuple(role for role, _ in identity.terms) for identity in IDENTITIES}
 
@@ -49,25 +49,33 @@ def load_series(root: Path, market: str, stock: str) -> dict[int, dict]:
         year, source = int(fin["year"]), fin["source"]["file"]
         # 未通过恒等式的数字下游不得当已核实：把相关 role 按年丢掉
         dropped = set()
-        for check in fin.get("identities") or []:
+        for check in fin.get("checks") or []:
             if check.get("status") == "fail":
                 # verbatim 这类校验把具体科目写在 missing 里，恒等式则按 terms 推断
                 names = check.get("missing") or _UNVERIFIED_ROLES.get(check.get("id") or "", ())
                 dropped |= {name.split("=")[0] for name in names}
         # 完整性从产物内容直接判：序列层要的是三张主表，缺一张这条序列就不可用（不依赖产物里存没存标记）
-        tables = set((fin.get("tables") or {}).keys())
+        segments = {segment["kind"]: segment for segment in fin.get("segments") or []}
+        tables = set(segments)
         complete = {"balance", "income", "cashflow"} <= tables
         missing = [kind for kind in ("balance", "income", "cashflow", "supplement", "equity") if kind not in tables]
         pages = {kind: value for kind, value in (fin["source"].get("pages") or {}).items() if value}
         supplement = [
             (row.get("label") or "", [value for value in (row.get("values") or [])])
-            for row in ((fin.get("tables") or {}).get("supplement") or {}).get("rows") or []
+            for row in (segments.get("supplement") or {}).get("rows") or []
             if any(value is not None for value in (row.get("values") or []))
         ]
-        if fin.get("roles"):
-            series[year] = {"roles": fin["roles"], "source": source, "basis": "本期", "complete": complete, "missing": missing, "pages": pages, "unit": fin.get("unit") or "元", "supplement": supplement, "dropped": dropped}
-        if fin.get("roles_prior"):
-            series[year - 1] = {"roles": fin["roles_prior"], "source": source, "basis": "上期（已重述口径）", "complete": complete, "missing": missing, "pages": pages, "unit": fin.get("unit") or "元", "supplement": supplement, "dropped": dropped}
+        # 固定字段从各段的行汇总：只认第一次出现的行（合计行在明细行前），成组 role 相加
+        fields: dict[str, float] = {}
+        fields_prior: dict[str, float] = {}
+        for segment in segments.values():
+            unit = segment.get("unit") or "元"
+            fields.update(roles_from_rows(segment.get("rows") or [], unit=unit))
+            fields_prior.update(roles_from_rows(segment.get("rows") or [], unit=unit, column=1))
+        if fields:
+            series[year] = {"roles": fields, "source": source, "basis": "本期", "complete": complete, "missing": missing, "pages": pages, "unit": fin.get("unit") or "元", "supplement": supplement, "dropped": dropped, "details": fin.get("details") or []}
+        if fields_prior:
+            series[year - 1] = {"roles": fields_prior, "source": source, "basis": "上期（已重述口径）", "complete": complete, "missing": missing, "pages": pages, "unit": fin.get("unit") or "元", "supplement": supplement, "dropped": dropped, "details": fin.get("details") or []}
     return series
 
 
@@ -415,6 +423,87 @@ def growth_table(series: dict[int, dict], years: list[int]) -> str:
     return _table(header, rows)
 
 
+def oci_table(series: dict[int, dict], years: list[int]) -> str:
+    """权益里的水分（亿元）：其他综合收益是已计入权益、还没变现的盈亏（course.md 六）。"""
+    rows, cumulative = [], 0.0
+    for year in years:
+        roles = series[year]["roles"]
+        current = _v(roles, "oci")
+        cumulative += current or 0.0
+        rows.append([str(year), _fmt(current, unit="亿"), _fmt(cumulative, unit="亿"), _pct(_div(cumulative, _v(roles, "equity_parent")))])
+    return _table(["年份", "其他综合收益（本期）", "其他综合收益（累计）", "累计/归母权益"], rows)
+
+
+def income_quality_table(series: dict[int, dict], years: list[int]) -> str:
+    """靠天吃饭的部分（亿元）：经营性 vs 财务性损益，比的是利润总额的构成。
+
+    口径：财务性 = 投资收益 + 公允价值变动收益 + 资产处置收益；汇兑损益含在财务费用里，
+    年报不单列时无法拆分，故不计入（见口径说明）。
+    """
+    financial = ("invest_income", "fv_change_income", "asset_disposal")
+    rows = []
+    for year in years:
+        roles = series[year]["roles"]
+        values = [_v(roles, role) for role in financial]
+        total = sum(value for value in values if value is not None) if any(value is not None for value in values) else None
+        profit = _v(roles, "total_profit")
+        operating = (profit - total) if profit is not None and total is not None else None
+        rows.append(
+            [
+                str(year),
+                *[_fmt(value, unit="亿") for value in values],
+                _fmt(total, unit="亿"),
+                _pct(_div(total, profit)),
+                _fmt(operating, unit="亿"),
+                _pct(_div(operating, profit)),
+            ]
+        )
+    header = ["年份", "投资收益", "公允价值变动收益", "资产处置收益", "财务性损益合计", "财务性/利润总额", "经营性损益", "经营性/利润总额"]
+    return _table(header, rows)
+
+
+def ratio_jump_table(series: dict[int, dict], years: list[int]) -> str:
+    """突变排名（取每年变化幅度最大的三项）：由程序排名，不让模型自己判断"什么算明显"。"""
+    pct_keys = ("成本率", "销售费用率", "管理费用率", "研发费用率", "财务费用率")
+    order = [*pct_keys, "应收账款周转率", "存货周转率", "总资产周转率"]
+    rows = []
+    for year in years:
+        current = {**expense_ratios(series[year]["roles"]), **turnover(series[year]["roles"], (series.get(year - 1) or {}).get("roles"))}
+        prior_item = series.get(year - 1)
+        prior = {**expense_ratios(prior_item["roles"]), **turnover(prior_item["roles"], (series.get(year - 2) or {}).get("roles"))} if prior_item else {}
+        changes = []
+        for key in order:
+            now, before = current.get(key), prior.get(key)
+            if now is None or before is None:
+                continue
+            changes.append((abs(now - before), key, now - before))
+        changes.sort(reverse=True)
+        ranked = []
+        for _, key, delta in changes[:3]:
+            ranked.append(f"{key} {delta * 100:+.1f}pp" if key in pct_keys else f"{key} {delta:+.2f}次")
+        rows.append([str(year), "、".join(ranked) if ranked else _MISSING])
+    return _table(["年份", "变化最大的三项（幅度降序）"], rows)
+
+
+def cash_gap_table(series: dict[int, dict], years: list[int]) -> str:
+    """净利润与经营活动现金流的差额（亿元）：背离的骨架，差额由程序算好，模型只许引用。"""
+    rows = []
+    for year in years:
+        roles, dropped = series[year]["roles"], series[year].get("dropped") or set()
+        net = _v(roles, "net_profit_parent", dropped)
+        ocf = _v(roles, "ocf", dropped)
+        rows.append(
+            [
+                str(year),
+                _fmt(net, unit="亿"),
+                _fmt(ocf, unit="亿"),
+                _fmt(ocf - net if net is not None and ocf is not None else None, unit="亿"),
+                _fmt(_div(ocf, net), digits=2),
+            ]
+        )
+    return _table(["年份", "归母净利", "经营现金流", "差额（经营现金流−归母净利）", "净现比"], rows)
+
+
 def asset_quality_table(series: dict[int, dict], years: list[int]) -> str:
     """资产质量（亿元）：应收能不能收回、存货要不要减值、钱有没有被限住。
 
@@ -543,6 +632,9 @@ def evidence(series: dict[int, dict], years: list[int] | None = None) -> str:
         ("每 100 元收入去向（元）", income_use_table),
         ("现金流结构（占收入比；净现比、收现比为倍数）", cash_table),
         ("资产质量（亿元；取自年报附注）", asset_quality_table),
+        ("权益里的其他综合收益（亿元）", oci_table),
+        ("经营性 vs 财务性损益（亿元）", income_quality_table),
+        ("比率突变的排名（程序排名，取每年变化最大的三项）", ratio_jump_table),
         ("资本与负债结构（亿元）", capital_structure_table),
         ("成本费用率与周转率（纵向突变的原料）", ratio_table),
         ("费用率与周转率的同比变化（率用百分点 pp，周转率用次）", ratio_delta_table),
@@ -574,6 +666,7 @@ def evidence(series: dict[int, dict], years: list[int] | None = None) -> str:
     parts.append("- 同比、自由现金流、分红比例均由程序计算；引用时照抄本表，不要自行换算或再计算")
     parts.append("- 有息负债 = 短期借款 + 长期借款 + 应付债券 + 租赁负债；股东投入取权益变动表「所有者投入和减少资本」")
     parts.append("- 留存 = 当年归母净利润 − 当年分红；所有者收益是另一个口径（现金口径），两者不要混用")
+    parts.append("- 「经营性 vs 财务性损益」口径：财务性 = 投资收益 + 公允价值变动收益 + 资产处置收益；汇兑损益含在财务费用里，年报不单列时无法拆分，故未计入")
     parts.append("- 资产质量取自年报附注：账龄两年以上应收按原表年限口径（只按信用期披露的年份留空）；受限货币资金照原文披露")
     parts.append(
         "- 经营活动现金流量调节表按「调整后」口径列示：正数表示该项目使经营现金流增加。"

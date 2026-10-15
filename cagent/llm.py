@@ -110,6 +110,9 @@ class LLM:
             data["response_format"] = {"type": "json_schema", "json_schema": {"name": "response", "schema": schema}}
         started = time.time()
         response = requests.post(f"{self.base_url}/chat/completions", headers={"Content-Type": "application/json"}, json=data)
+        if response.status_code >= 400:
+            # 服务端会说明是上下文超了还是语法编译失败，带出来才不用猜
+            raise RuntimeError(f"模型服务返回 {response.status_code}：{response.text[:400]}（prompt {len(prompt)} 字符，max_tokens {data['max_tokens']}）")
         response.raise_for_status()
         body = response.json()
         choice = body["choices"][0]

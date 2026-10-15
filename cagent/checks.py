@@ -15,6 +15,7 @@
     from cagent.checks import IDENTITIES, check_report, rollforward_check, verbatim_check, verify
 """
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
@@ -187,3 +188,44 @@ def verbatim_check(kind: str, table: dict, report_text: str) -> Check:
                 missing.append(f'{row.get("role") or row.get("label")}={float(value):,.2f}')
                 break
     return Check(f"verbatim.{kind}", "每个数都要在年报原文里逐字出现", "pass" if not missing else "fail", None, tuple(missing[:5]))
+
+
+_PAGE_MARK = re.compile(r"<!-- page (\d+) -->")
+_PAGE_CITE = re.compile(r"p\.\s?(\d+)")
+_YEAR = re.compile(r"(?:19|20)\d{2}")
+_NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
+
+
+def numbers_in(text: str) -> list[tuple[str, int]]:
+    """文本里的数字 → [(原样, 小数位数)]；先摘掉页码引用、年份与列表序号，它们不是数据声明。"""
+    cleaned = _PAGE_CITE.sub(" ", _PAGE_MARK.sub(" ", text))
+    cleaned = _YEAR.sub(" ", cleaned)
+    cleaned = re.sub(r"(?m)^\s*\d+[.、)]\s", " ", cleaned)
+    return [(token, len(token.split(".")[1]) if "." in token else 0) for token in _NUMBER.findall(cleaned)]
+
+
+def allowed_numbers(evidence_text: str) -> set[float]:
+    """证据表里出现过的数——正文只许引用这些。"""
+    return {float(token.replace(",", "")) for token, _ in numbers_in(evidence_text)}
+
+
+def on_evidence(value: float, decimals: int, allowed: set[float], *, tol: float = 0.5) -> bool:
+    """按正文写出的小数位，判断这个数是否落在证据表某个数上。"""
+    return any(abs(candidate - value) <= max(tol, 0.5 * 10 ** (-decimals) + 1e-9) for candidate in allowed)
+
+
+def outside_numbers(text: str, evidence_text: str, *, tol: float = 0.5) -> list[str]:
+    """正文里越界的数字：不在证据表上的那些（模型自己算或记错的）。按正文写到的小数位比对。"""
+    allowed = allowed_numbers(evidence_text)
+    outside = []
+    for token, decimals in numbers_in(text):
+        value = float(token.replace(",", ""))
+        if not on_evidence(value, decimals, allowed, tol=tol):
+            outside.append(token)
+    return outside
+
+
+def grounded_check(text: str, evidence_text: str, *, check_id: str = "report.grounded") -> Check:
+    """报告层校验：正文里的每个数字都要能在证据表里找到——模型自算的差额、占比都算越界。"""
+    outside = outside_numbers(text, evidence_text)
+    return Check(check_id, "正文数字必须来自证据表（模型不碰算术）", "pass" if not outside else "fail", None, tuple(outside[:8]))
