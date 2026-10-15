@@ -21,8 +21,8 @@ import sys
 import textwrap
 from pathlib import Path
 
-from cagent.agent import Agent
 from cagent.finance_series import evidence, load_series
+from cagent.llm import LLM
 from cagent.wiki_render import render_doc
 
 logger = logging.getLogger(__name__)
@@ -109,23 +109,19 @@ def _decompose_prefix(evidence_text: str, business_text: str) -> str:
         </evidence>""").strip()
 
 
-def decompose_capital_return(agent: Agent, evidence_text: str, business_text: str) -> str:
+def decompose_capital_return(agent: LLM, evidence_text: str, business_text: str) -> str:
     """按维度逐条拆解：每条一次调用，标题由程序写，模型只写内容。"""
     prefix = _decompose_prefix(evidence_text, business_text)
     blocks = []
     for index, (title, instruction) in enumerate(_DIMENSIONS, 1):
         # max_tokens 卡死 decode：一条维度写 150 字左右就够，多写的就是白花时间
-        answer = agent.chat(
-            messages=[{"role": "user", "content": f"{prefix}\n\n<task>只写这一维：{title}\n{instruction}</task>"}],
-            max_tokens=512,
-            temperature=0,
-        ).strip()
+        answer = agent.complete(f"{prefix}\n\n<task>只写这一维：{title}\n{instruction}</task>", max_tokens=512).strip()
         logger.info(f"  {index}/{len(_DIMENSIONS)} {title}（{len(answer)} 字）")
         blocks.append(f"### {index}. {title}\n\n{answer}")
     return "\n\n".join(blocks)
 
 
-def gen_finance(agent: Agent, stock: str, market: str, root: Path) -> str:
+def gen_finance(agent: LLM, stock: str, market: str, root: Path) -> str:
     series = load_series(root, market, stock)
     years = sorted(series)[-5:]
     evidence_text = "\n".join(evidence(series, years).splitlines()[1:]).strip()  # 去掉证据表自带的一级标题，嵌入时不再多一层
@@ -156,7 +152,7 @@ def main() -> None:
     if md_output_path.exists() and not args.force:
         doc = md_output_path.read_text(encoding="utf-8")
     else:
-        doc = gen_finance(Agent(trace=True), args.stock, args.market, Path(args.root))
+        doc = gen_finance(LLM(trace=True), args.stock, args.market, Path(args.root))
         md_output_path.write_text(doc, encoding="utf-8")
 
     print(doc)

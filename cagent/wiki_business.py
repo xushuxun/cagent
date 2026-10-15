@@ -15,8 +15,8 @@ import sys
 import textwrap
 from pathlib import Path
 
-from cagent.agent import Agent
 from cagent.chunk import Toc
+from cagent.llm import LLM
 from cagent.wiki_render import render_doc
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,7 @@ MiniMax 是一家全球化人工智能基础模型公司，主营自研全模态
 ]
 
 
-def _load_latest_annual_chunks(agent: Agent, stock: str, market: str, root: Path) -> list[str]:
+def _load_latest_annual_chunks(agent: LLM, stock: str, market: str, root: Path) -> list[str]:
     """加载最新一份年报，选择相关章节。"""
     mds = sorted((root / market / stock / "derived").glob("*.md"))
     if not mds:
@@ -80,7 +80,7 @@ def _load_latest_annual_chunks(agent: Agent, stock: str, market: str, root: Path
     return chunks
 
 
-def gen_business(agent: Agent, stock: str, market: str, root: Path) -> str:
+def gen_business(agent: LLM, stock: str, market: str, root: Path) -> str:
     # 商业模式分析只需要最新一份年报
     chunks = _load_latest_annual_chunks(agent, stock, market, root)
 
@@ -126,7 +126,7 @@ def main() -> None:
 
     else:
         root = Path(args.root)
-        agent = Agent(trace=True)
+        agent = LLM(trace=True)
         doc = gen_business(agent, args.stock, args.market, root)
         md_output_path.write_text(doc, encoding="utf-8")
 

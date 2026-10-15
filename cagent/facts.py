@@ -1,22 +1,68 @@
-"""finance_extract 模块：财报数字层
+"""facts：事实层——契约与抽取
 
-模型提表、程序校验。流程：LLM 选章节 → 程序出紧凑表清单 → LLM 挑合并报表 → LLM 逐表提数并标注 role →
-程序跑会计恒等式（finance_identity）→ 不通过则把失败等式连原表回喂定向重取（≤2 轮）。
-数字一律取原表值，模型禁止计算、禁止改数；恒等式不通过的数字进 unresolved，下游不得当作已核实。
+契约（无版本号；契约变了就删产物重算）：
+    fields     固定字段：准则强制列报、且挂着判据的行。只有这一层参与算术，跨公司可比性由它承担。
+    details    按需明细：公司特有、行名与含义各异，不做字段映射，只做逐字校验，供叙述引用。
+    checks     校验结论：恒等式、逐字、页码可溯源。未通过的进 unresolved，下游按缺数处理。
+    segments   一段事实 = 一张报表或一节附注，页码随段带出（表级页码已够溯源，逐值页码要多花 decode）。
 
-产物：<root>/<market>/<stock>/knowledge/<公告stem>/financials.json（幂等缓存），字段：
-    year/source/file/pages/picked  溯源与断点
-    tables{kind: {title, consolidated, unit, pages, columns, rows[{label, role, values}]}}  原表行，values 按 columns 对齐
-    roles / roles_prior            程序从 rows 归集出的本期、上期口径 {role: 元}
-    identities[{id, desc, status, delta, missing}]  恒等式结论（pass/fail/skip/diff）
-    unresolved                     fail 的恒等式 id，这些数字下游不得当作已核实
-只产内容，不管 UI；分析层见 wiki_finance.py。
-
-用法：
-    uv run cagent/finance_extract.py --stock 601633 --market cn
-    uv run cagent/finance_extract.py --stock 601633 --market cn --force
-    uv run cagent/finance_extract.py --stock 601633 --market cn --kind income    # 只重取一张表，其余沿用
+抽取：模型读原表抄成紧凑四元数组 → 程序跑校验 → 把失败的具体形态（哪一行让等式差多少、
+哪一行取相反数就能对上、原表披露了但没抄的行）反馈回去重试，只在变好时采纳。
 """
+
+from typing import TypedDict
+
+
+class Value(TypedDict):
+    """一个字段的两期值：本期在前、上期在后；缺数为 None。"""
+
+    value: float | None
+    prev: float | None
+
+
+class Detail(TypedDict):
+    """按需明细：行名照原文，不做字段映射。"""
+
+    label: str
+    value: float | None
+    prev: float | None
+    kind: str
+    page: int | None
+
+
+class CheckResult(TypedDict):
+    """一条校验结论。status 取 pass / fail / skip / diff。"""
+
+    id: str
+    desc: str
+    status: str
+    delta: float | None
+    missing: list[str]
+
+
+class Segment(TypedDict):
+    """一段事实（一张报表或一节附注）。"""
+
+    kind: str
+    title: str
+    consolidated: bool
+    unit: str
+    pages: list[int]
+    columns: list[str]
+    fields: dict[str, Value]
+    details: list[Detail]
+
+
+class Facts(TypedDict):
+    """一份年报的事实。"""
+
+    year: int
+    source: dict
+    segments: list[Segment]
+    fields: dict[str, Value]
+    details: list[Detail]
+    checks: list[CheckResult]
+    unresolved: list[str]
 
 import argparse
 import json
@@ -26,10 +72,16 @@ import sys
 import textwrap
 from pathlib import Path
 
-from cagent.agent import Agent
+from cagent.checks import IDENTITIES, Check, check_report, rollforward_check, verbatim_check, verify
 from cagent.chunk import Toc, report_year, split_pages
-from cagent.finance_identity import IDENTITIES, ROLES_BY_KIND, Check, check_report, duplicate_roles, number, roles_from_rows, rollforward_check, verify
+from cagent.fields import ROLES, ROLES_BY_KIND, duplicate_roles, number, roles_from_rows
+from cagent.llm import LLM
 from cagent.scraper.lakehouse_index import atomic_write
+
+logger = logging.getLogger(__name__)
+
+_IDENTITY_BY_ID = {identity.id: identity for identity in IDENTITIES}
+
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +151,7 @@ def _inventory_text(inventory: list[dict]) -> str:
     )
 
 
-def pick_tables(agent: Agent, inventory: list[dict]) -> dict[str, list[str]]:
+def pick_tables(agent: LLM, inventory: list[dict]) -> dict[str, list[str]]:
     """让模型从清单里挑出各张合并报表（排除母公司口径），返回 {kind: [table id]}。"""
     listing = "\n".join(f"- {kind}：{_KIND_TITLE[kind]}" for kind in KINDS)
     prompt = textwrap.dedent(f"""
@@ -175,6 +227,7 @@ def _equity_prompt(tables_html: str) -> str:
         - 抄录原表数值，禁止计算、禁止改数；千分位逗号去掉，括号负数改成负号
         - unit 照抄原表单位；两项都找不到就不输出行
         - columns 填 [本期, 上期]；rows 只放上面这两行
+        - consolidated 填 true 仅当你抄的是合并口径那张表；母公司（公司）表填 false
         </requirement>
 
         <tables>
@@ -209,30 +262,76 @@ def _statement_prefix(kind: str, tables_html: str) -> str:
         </tables>""").strip()
 
 
-def _extract_prompt(kind: str, tables_html: str) -> str:
-    return _statement_prefix(kind, tables_html) + "\n\n<task>按上面的四元数组格式输出全部 role 行。</task>"
+def _extract_tail() -> str:
+    return "<task>按上面的四元数组格式输出全部 role 行。</task>"
 
 
-def _repair_prompt(kind: str, tables_html: str, wrong_rows: list[dict], failures: list[Check], roles: dict[str, float]) -> str:
-    lines = []
-    for check in failures:
-        terms = " ".join(f"{sign:+.0f}×{role}={roles.get(role, 0.0):,.2f}" for role, sign in _IDENTITY_BY_ID[check.id].terms)
-        lines.append(f"- {check.id}（{check.desc}）当前 Δ={check.delta:,.2f}\n  {terms}")
-    current = [[row.get("label"), row.get("role"), *[v for v in (row.get("values") or [None, None])[:2]]] for row in wrong_rows]
-    return _statement_prefix(kind, tables_html) + textwrap.dedent(f"""
-
+def _repair_tail(table: dict, feedback: str) -> str:
+    current = [[row.get("label"), row.get("role"), *[v for v in (row.get("values") or [None, None])[:2]]] for row in table.get("rows") or []]
+    return textwrap.dedent(f"""
         <current>
         {json.dumps(current, ensure_ascii=False)}
         </current>
 
         <task>
-        上面这几行的数让会计恒等式对不上：
+        上面这些数过不了校验：
 
-        {"\n".join(lines)}
+        {feedback}
 
-        请对照 <tables> 原表逐行核对（错抄、漏抄、串列、漏了括号负号），**只输出需要改正的那几行**，
-        格式与上面相同；没把握的行也照原表重抄一遍。不要输出其它行。
-        </task>""")
+        回 <tables> 逐行核对后，**只输出需要改正的那几行**（同样的四元数组）；没把握的行照原表重抄一遍。
+        </task>""").strip()
+
+
+def _sign_hints(identity, roles: dict[str, float]) -> list[str]:
+    """哪一行取相反数就能对上——把符号问题定位到具体行，不靠提示词里的通则。"""
+    delta = sum(sign * float(roles.get(role) or 0.0) for role, sign in identity.terms)
+    hints = []
+    for role, sign in identity.terms:
+        value = float(roles.get(role) or 0.0)
+        if value == 0:
+            continue
+        flipped = delta - 2 * sign * value
+        if abs(flipped) < abs(delta) * 0.5:
+            hints.append(f"{role} 现在是 {value:,.2f}，取相反数后 Δ 从 {delta:,.2f} 变为 {flipped:,.2f}")
+    return hints
+
+
+def segment_feedback(kind: str, table: dict | None, known_roles: dict[str, float] | None = None) -> tuple[int, str]:
+    """这一段的分数与反馈：分数越低越好，反馈要具体到行与数。
+
+    反馈三样东西，都是程序从校验结果里算出来的，不是通用规则：
+    失败的等式（含参与项的值）、可疑的符号（取反后残差明显变小）、原表披露但没抄的行。
+    """
+    if table is None:
+        return 3, "上一轮没有返回可解析的表。"
+    roles = {**(known_roles or {}), **roles_from_rows(table.get("rows") or [], unit=table.get("unit") or "元")}
+    checks = [check for check in verify(roles) if check.id.startswith(kind)]
+    failures = [check for check in checks if check.status == "fail"]
+    # 只提示"同一等式里多数项都在、只缺一两行"的漏抄：整张表都没有的行不算漏
+    missing: list[str] = []
+    for check in checks:
+        if check.status != "skip":
+            continue
+        identity = _IDENTITY_BY_ID[check.id]
+        present = [role for role, _ in identity.terms if role in roles]
+        if len(present) >= max(2, round(len(identity.terms) * 0.6)):
+            missing += list(check.missing)
+    missing = sorted(set(missing))[:3]
+    scope_ok = table.get("consolidated") is True
+    score = len(failures) * 2 + (0 if scope_ok else 1) + min(len(missing), 2)
+    lines = []
+    for check in failures:
+        identity = _IDENTITY_BY_ID[check.id]
+        terms = "；".join(f"{role}={roles.get(role, 0.0):,.2f}" for role, _ in identity.terms)
+        lines.append(f"- {check.id}（{identity.desc}）Δ={check.delta:,.2f}\n  {terms}")
+        hints = _sign_hints(identity, roles)
+        if hints:
+            lines.append("  符号可疑：" + "；".join(hints))
+    if missing:
+        lines.append("- 原表若披露了这些行就该抄上：" + "、".join(ROLES.get(role, role) for role in missing))
+    if not scope_ok:
+        lines.append("- 本段要的是合并报表口径（母公司报表同样满足恒等式，口径却不对）")
+    return score, "\n".join(lines) or "无"
 
 
 def _consolidated_check(kind: str, table: dict) -> Check:
@@ -252,73 +351,36 @@ def _tables_html(inventory: list[dict], ids: list[str]) -> str:
     return "\n\n".join(parts)
 
 
-def extract_kind(agent: Agent, kind: str, inventory: list[dict], ids: list[str], max_repair: int = 2) -> tuple[dict | None, list[Check]]:
-    """抽一张表并用恒等式反复校验，返回 (表, 校验结果)。
+def extract_kind(agent: LLM, kind: str, inventory: list[dict], ids: list[str], attempts: int = 3) -> tuple[dict | None, list[Check]]:
+    """抽一张表并反复校验：校验驱动的收敛，只在变好时采纳。
 
-    权益变动表只提两笔事实、且要用到利润表与资产负债表的数才能校验，故不走这张表自己的重取循环，
+    权益变动表只提两笔事实、且要靠利润表与资产负债表的数才能校验，故不走这张表的收敛循环，
     残差在跨表校验里报。
     """
     html = _tables_html(inventory, ids)
     if not html:
         return None, []
-    prompt = _equity_prompt(html) if kind == "equity" else _extract_prompt(kind, html)
-    table = _normalize_table(agent.chat_json(prompt, _extract_schema()))
+    table = _normalize_table(agent.chat_json(_equity_prompt(html), _extract_schema())) if kind == "equity" else None
     if kind == "equity":
         return table, []
-    for attempt in range(max_repair + 1):
-        roles = roles_from_rows(table["rows"], unit=table.get("unit") or "元")
-        checks = [check for check in verify(roles) if check.id.startswith(kind)]
-        failures = [check for check in checks if check.status == "fail"]
-        if not failures:
-            return table, checks
-        if attempt == max_repair:
-            logger.warning(f"{kind} 仍有 {len(failures)} 条恒等式不通过：{[c.id for c in failures]}")
-            return table, checks
-        # 只把与失败恒等式有关的行回给模型改，返回的也只是这几行
-        suspects = {role for check in failures for role, _ in _IDENTITY_BY_ID[check.id].terms}
-        wrong_rows = [row for row in table["rows"] if row.get("role") in suspects] or table["rows"]
-        logger.info(f"{kind} 第 {attempt + 1} 次重取（{len(wrong_rows)} 行）：{[c.id for c in failures]}")
-        patch = _rows_from_compact(agent.chat_json(_repair_prompt(kind, html, wrong_rows, failures, roles), _patch_schema()).get("rows"), table["columns"])
-        candidate = {**table, "rows": _merged_rows(table["rows"], patch)}
-        candidate_failures = _failure_count(kind, candidate)
-        if candidate_failures >= len(failures):
-            logger.warning(f"{kind} 重取没有变好（{len(failures)} → {candidate_failures}），保留原结果")
-            return table, checks
-        table = candidate
-    return table, checks
 
+    task = agent.task(_statement_prefix(kind, html))
 
-def _number_forms(value: float) -> list[str]:
-    """一个数在年报里可能的写法：不同小数位，以及千元/万元/亿元等单位的换算写法。
+    def tail(previous: dict | None, feedback: str) -> str:
+        return _extract_tail() if previous is None else _repair_tail(previous, feedback)
 
-    年报里同一个数可能写作「1.12亿元」或「5,037,603 千元」，只按原样匹配会误报。
-    """
-    forms: set[str] = set()
-    for scaled in (value, value / 1e3, value * 1e3, value / 1e4, value * 1e4, value / 1e8, value * 1e8):
-        for text in (f"{scaled:,.2f}", f"{scaled:,.0f}", f"{scaled:f}".rstrip("0").rstrip("."), f"{scaled:,.6f}".rstrip("0").rstrip(".")):
-            cleaned = text.replace(",", "")
-            if cleaned and cleaned not in {"0", "-0"}:
-                forms.add(cleaned)
-    return sorted(forms)
+    def check(value: dict) -> tuple[int, str]:
+        return segment_feedback(kind, value)
 
-
-def verbatim_check(kind: str, table: dict, report_text: str) -> Check:
-    """数字必须在年报原文里逐字出现。
-
-    恒等式能保勾稽，保不了"这个数是不是报表里的"——模型完全可以编一个让等式成立的数
-    （实测出现过：FY2023 存货账面余额 26,820,920,280.72 在年报里一次都没有）。
-    """
-    squashed = report_text.replace(",", "").replace("，", "")
-    missing = []
-    for row in table.get("rows") or []:
-        for value in row.get("values") or []:
-            if value is None or abs(float(value)) < 1000:   # 太小的数在全文中易巧合命中，不作为证据
-                continue
-            if not any(form in squashed for form in _number_forms(float(value))):
-                missing.append(f'{row.get("role") or row.get("label")}={float(value):,.2f}')
-                break
-    status = "pass" if not missing else "fail"
-    return Check(f"verbatim.{kind}", "每个数都要在年报原文里逐字出现", status, None, tuple(missing[:5]))
+    table, score, feedback = task.converge(tail, parse=lambda raw, previous: _merge_candidate(previous, json.loads(raw)), check=check,
+                                           schema=lambda round_no, previous: _extract_schema() if previous is None else _patch_schema(),
+                                           attempts=attempts)
+    if table is None:
+        return None, []
+    roles = roles_from_rows(table["rows"], unit=table.get("unit") or "元")
+    if score > 0:
+        logger.warning(f"{kind} 收敛未完成（分数 {score}）：{feedback.splitlines()[0] if feedback else ''}")
+    return table, [check for check in verify(roles) if check.id.startswith(kind)]
 
 
 def _failure_count(kind: str, table: dict, known_roles: dict[str, float] | None = None) -> int:
@@ -327,9 +389,21 @@ def _failure_count(kind: str, table: dict, known_roles: dict[str, float] | None 
     return sum(1 for check in verify(roles) if check.id.startswith(kind) and check.status == "fail")
 
 
-def _normalize_table(raw: dict) -> dict:
+def _merge_candidate(previous: dict | None, raw: dict, columns: list[str] | None = None) -> dict:
+    """把一轮回复并成候选表：首轮整表照收，重取只回错行则按 role 并回原表。"""
+    table = _normalize_table(raw, columns)
+    if previous is None:
+        return table
+    merged = {**previous, "rows": _merged_rows(previous.get("rows") or [], table.get("rows") or [])}
+    for key in ("title", "unit", "pages", "columns", "consolidated"):
+        if raw.get(key) is not None:
+            merged[key] = table.get(key) or raw.get(key)
+    return merged
+
+
+def _normalize_table(raw: dict, columns: list[str] | None = None) -> dict:
     """模型返回的紧凑表 → 规范表（行变 dict，columns 变字符串列表）。"""
-    columns = [str(c) for c in (raw.get("columns") or [])]
+    columns = [str(c) for c in (raw.get("columns") or columns or [])]
     return {**raw, "columns": columns, "rows": [row for row in _rows_from_compact(raw.get("rows"), columns) if row["role"]]}
 
 
@@ -345,7 +419,7 @@ def _merged_rows(rows: list[dict], patch: list[dict]) -> list[dict]:
     return merged
 
 
-def extract_notes(agent: Agent, toc: Toc, known_roles: dict[str, float] | None = None, max_repair: int = 2) -> tuple[dict | None, list[Check]]:
+def extract_notes(agent: LLM, toc: Toc, known_roles: dict[str, float] | None = None, max_repair: int = 2) -> tuple[dict | None, list[Check]]:
     """附注事实：章节检索 → 片段定位 → 提数标 role → 用 notes 恒等式对账 → 不通过则定向重取。
 
     事实散在附注各处，不像三表那样能一次给全，所以先检索再抽取；页码随表带出。
@@ -387,32 +461,15 @@ def extract_notes(agent: Agent, toc: Toc, known_roles: dict[str, float] | None =
         {html}
         </segments>""").strip()
 
-    table = _normalize_table(agent.chat_json(prefix + "\n\n<task>按四元数组输出上述事实。</task>", _extract_schema()))
-    for attempt in range(max_repair + 1):
-        roles = roles_from_rows(table["rows"], unit=table.get("unit") or "元")
-        checks = [check for check in verify({**(known_roles or {}), **roles}) if check.id.startswith("notes")]
-        failures = [check for check in checks if check.status == "fail"]
-        if not failures:
-            return table, checks
-        if attempt == max_repair:
-            logger.warning(f"附注仍有 {len(failures)} 条不成立：{[c.id for c in failures]}")
-            return table, checks
-        suspects = {role for check in failures for role, _ in _IDENTITY_BY_ID[check.id].terms}
-        wrong_rows = [row for row in table["rows"] if row.get("role") in suspects] or table["rows"]
-        lines = []
-        for check in failures:
-            terms = []
-            for role, _ in _IDENTITY_BY_ID[check.id].terms:
-                if role in known_roles:
-                    terms.append(f"{role}={known_roles[role]:,.2f}（来自主表，已核实，不要改）")
-                else:
-                    terms.append(f"{role}={roles.get(role, float('nan')):,.2f}（你给的）")
-            lines.append(f"- {check.id}（{check.desc}）当前 Δ={check.delta:,.2f}\n  " + "；".join(terms))
-        detail = "\n".join(lines)
-        logger.info(f"附注第 {attempt + 1} 次重取（{len(wrong_rows)} 行）：{[c.id for c in failures]}")
-        current = [[row.get("label"), row.get("role"), *[v for v in (row.get("values") or [None, None])[:2]]] for row in wrong_rows]
-        patch_prompt = prefix + textwrap.dedent(f"""
+    known = known_roles or {}
+    notes_task = agent.task(prefix)
 
+    def tail(previous: dict | None, feedback: str) -> str:
+        if previous is None:
+            return "<task>按四元数组输出上述事实。</task>"
+        current = [[row.get("label"), row.get("role"), *[v for v in (row.get("values") or [None, None])[:2]]] for row in previous.get("rows") or []]
+        verified = "；".join(f"{role}={value:,.2f}（来自主表，已核实，不要改）" for role, value in known.items() if role in {r for check in verify(known) for r, _ in _IDENTITY_BY_ID[check.id].terms})
+        return textwrap.dedent(f"""
             <current>
             {json.dumps(current, ensure_ascii=False)}
             </current>
@@ -420,22 +477,29 @@ def extract_notes(agent: Agent, toc: Toc, known_roles: dict[str, float] | None =
             <task>
             上面这几项与主表对不上：
 
-            {detail}
+            {feedback}
 
-            回 <segments> 核对：账龄表的账面余额是否含了坏账准备、跌价准备是否抄成了账面价值、
-            受限资金是否抄成了全部货币资金、单位是否换算错。**只输出需要改正的那几行**（同样的四元数组）。
-            </task>""")
-        patch = _rows_from_compact(agent.chat_json(patch_prompt, _patch_schema()).get("rows"), table["columns"])
-        candidate = {**table, "rows": _merged_rows(table["rows"], patch)}
-        candidate_failures = _failure_count(NOTES, candidate, known_roles)
-        if candidate_failures >= len(failures):
-            logger.warning(f"附注重取没有变好（{len(failures)} → {candidate_failures}），保留原结果")
-            return table, checks
-        table = candidate
+            已核实的主表数：{verified}
+
+            回 <segments> 逐项核对后，**只输出需要改正的那几行**（同样的四元数组）。
+            </task>""").strip()
+
+    table, score, _ = notes_task.converge(
+        tail,
+        parse=lambda raw, previous: _merge_candidate(previous, json.loads(raw)),
+        check=lambda value: segment_feedback(NOTES, value, known),
+        schema=lambda round_no, previous: _extract_schema() if previous is None else _patch_schema(),
+        attempts=max_repair + 1,
+    )
+    if table is None:
+        return None, []
+    checks = [check for check in verify({**known, **roles_from_rows(table["rows"], unit=table.get("unit") or "元")}) if check.id.startswith("notes")]
+    if score > 0:
+        logger.warning(f"附注收敛未完成（分数 {score}）")
     return table, checks
 
 
-def extract_financials(agent: Agent, md_path: str | Path, root: Path, market: str = "", stock: str = "", kinds: tuple[str, ...] = _ALL_KINDS, base: dict | None = None) -> dict:
+def extract_financials(agent: LLM, md_path: str | Path, root: Path, market: str = "", stock: str = "", kinds: tuple[str, ...] = _ALL_KINDS, base: dict | None = None) -> dict:
     """一份年报 md → financials.json，返回解析后的 dict。
 
     kinds 限定只重取哪几张表（迭代单张表用）；base 是已有产物，未重取的表与恒等式结论沿用。
@@ -543,7 +607,7 @@ def main() -> None:
         raise SystemExit(f"{derived} 没有年报 md，先跑 ocr/cli.py")
 
     kinds = tuple(args.kind) if args.kind else _ALL_KINDS
-    agent = Agent(trace=True)
+    agent = LLM(trace=True)
     failed: list[str] = []
     for md_path in mds:
         out_path = Path(args.root) / args.market / args.stock / "knowledge" / md_path.stem / "financials.json"

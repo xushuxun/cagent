@@ -17,8 +17,8 @@ import sys
 import textwrap
 from pathlib import Path
 
-from cagent.agent import Agent
 from cagent.chunk import Toc, report_year
+from cagent.llm import LLM
 from cagent.wiki_render import render_doc
 
 logger = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ def _bullets(text: str) -> str:
     return re.sub(r"(?<=[。；;])\s+(?=[-*] )", "\n", text.strip())
 
 
-def gen_decisions(agent: Agent, stock: str, market: str, root: Path) -> str:
+def gen_decisions(agent: LLM, stock: str, market: str, root: Path) -> str:
     derived = root / market / stock / "derived"
     mds = sorted(derived.glob("*.md"))
     if not mds:
@@ -152,7 +152,7 @@ def main() -> None:
 
     else:
         root = Path(args.root)
-        agent = Agent(trace=True)
+        agent = LLM(trace=True)
         doc = gen_decisions(agent, args.stock, args.market, root)
         md_output_path.write_text(doc, encoding="utf-8")
 

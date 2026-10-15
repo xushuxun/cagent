@@ -17,7 +17,7 @@ import sys
 import textwrap
 from pathlib import Path
 
-from cagent.agent import Agent
+from cagent.llm import LLM
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def _plain(text: str) -> str:
     return _TAG_RE.sub(" ", text).strip()
 
 
-def report_year(agent: Agent, md_path: str | Path) -> int:
+def report_year(agent: LLM, md_path: str | Path) -> int:
     """报告期年份：问模型这份年报属于哪个年度。md 文件名是披露日（次年披露），不是报告期。"""
     md_path = Path(md_path)
     cache = md_path.with_suffix(".year.json")
@@ -146,7 +146,7 @@ def split_pages(text: str) -> list[str]:
     """
     return _PAGE_RE.split(text)[1:]
 
-def _is_page_english(agent: Agent, page_text: str) -> bool:
+def _is_page_english(agent: LLM, page_text: str) -> bool:
     prompt = textwrap.dedent(f"""
         <requirements>
         页面是否是英文内容
@@ -165,7 +165,7 @@ def _is_page_english(agent: Agent, page_text: str) -> bool:
     return agent.chat_json(prompt=prompt, schema=response_format)["is_english"] 
 
 
-def _is_page_has_toc(agent: Agent, page_text: str) -> bool:
+def _is_page_has_toc(agent: LLM, page_text: str) -> bool:
     prompt = textwrap.dedent(f"""
         <requirements>
         判断页面是否是年报正文的目录页
@@ -189,7 +189,7 @@ def _is_page_has_toc(agent: Agent, page_text: str) -> bool:
     return agent.chat_json(prompt=prompt, schema=response_format)["has_toc"]
 
 
-def _extract_toc_from_text(agent: Agent, toc_text: str) -> list[dict]:
+def _extract_toc_from_text(agent: LLM, toc_text: str) -> list[dict]:
     prompt = textwrap.dedent(f"""
         <requirements>
         提取目录中章节及其页码
@@ -230,7 +230,7 @@ def _extract_toc_from_text(agent: Agent, toc_text: str) -> list[dict]:
     return agent.chat_json(prompt=prompt, schema=response_format)["chapters"]
 
 
-def _locate_chapter_first_page(agent: Agent, pages: list[str], chapter: dict, lo: int, hi: int) -> int | None:
+def _locate_chapter_first_page(agent: LLM, pages: list[str], chapter: dict, lo: int, hi: int) -> int | None:
     """在页码 [lo, hi] 窗口内让 LLM 定位章节起始页，返回页码或 None。"""
     lo, hi = max(1, lo), min(len(pages), hi)
     prompt = textwrap.dedent(f"""
@@ -253,7 +253,7 @@ def _locate_chapter_first_page(agent: Agent, pages: list[str], chapter: dict, lo
     return index if index is not None and lo <= index <= hi else None
 
 
-def _compute_page_offset(agent: Agent, pages: list[str], chapter: dict) -> int:
+def _compute_page_offset(agent: LLM, pages: list[str], chapter: dict) -> int:
     """用 LLM 在目录印刷页码附近定位章节起始页，返回 offset = md 页码 - 印刷页码。
 
     定位窗口以印刷页码为中心，前后共 5 页，找不到扩到 9 页。
@@ -266,7 +266,7 @@ def _compute_page_offset(agent: Agent, pages: list[str], chapter: dict) -> int:
     raise ValueError(f"无法定位章节起始页：{chapter['title']}")
 
 
-def _is_page_chapter_first(agent: Agent, chapter: dict, page_text: str) -> bool:
+def _is_page_chapter_first(agent: LLM, chapter: dict, page_text: str) -> bool:
     """让 agent 判断单页是否是指定章节的起始页。"""
     prompt = textwrap.dedent(f"""
         <requirements>
@@ -289,7 +289,7 @@ def _is_page_chapter_first(agent: Agent, chapter: dict, page_text: str) -> bool:
     return agent.chat_json(prompt=prompt, schema=response_format)["is_chapter_start"]
 
 
-def _align_toc(agent: Agent, pages: list[str], chapters: list[dict]) -> list[dict]:
+def _align_toc(agent: LLM, pages: list[str], chapters: list[dict]) -> list[dict]:
     """从第一章算 offset，逐章用单页判断校验预测起始页；不正确时从该章重算 offset。
 
     返回 [{"title", "page", "md_page"}]，md_page 为对齐后的 md 起始页码。
@@ -314,7 +314,7 @@ def _align_toc(agent: Agent, pages: list[str], chapters: list[dict]) -> list[dic
 class Toc:
     """年报目录：章节列表 + 页码范围，以及原始 md。"""
 
-    def __init__(self, agent: Agent, md_path: str | Path, rebuild: bool = False):
+    def __init__(self, agent: LLM, md_path: str | Path, rebuild: bool = False):
         self.agent = agent
 
         md_path = Path(md_path)
@@ -463,7 +463,7 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--input", help="单文件调试模式，指定 md 文件路径")
     args = parser.parse_args()
 
-    agent = Agent()
+    agent = LLM()
 
     if args.input:
         toc = Toc(agent, args.input)

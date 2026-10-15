@@ -1,6 +1,6 @@
 """finance_series 模块：多年序列与机械算术（纯函数，无 LLM、无 IO）
 
-把 finance_extract 产的多年 financials.json 拼成一条序列，再做不含判断的算术：收入去向、现金流结构、
+把 facts 产的多年 financials.json 拼成一条序列，再做不含判断的算术：收入去向、现金流结构、
 周转与费用率的逐年变化、累计与滚动、所有者收益。判读（哪条重要、算不算异常）留给分析层：
 本模块不下结论、不设阈值、不挑指标。
 
@@ -18,7 +18,8 @@ import logging
 import sys
 from pathlib import Path
 
-from cagent.finance_identity import DA_ROLES, IDENTITIES, ROLES, UNIT_SCALE
+from cagent.checks import IDENTITIES
+from cagent.fields import DA_ROLES, ROLES, UNIT_SCALE
 
 _UNVERIFIED_ROLES = {identity.id: tuple(role for role, _ in identity.terms) for identity in IDENTITIES}
 
@@ -41,7 +42,7 @@ def load_series(root: Path, market: str, stock: str) -> dict[int, dict]:
         reports.append(json.loads(path.read_text(encoding="utf-8")))
     reports.sort(key=lambda fin: int(fin["year"]))
     if not reports:
-        raise SystemExit(f"{Path(root) / market / stock / 'knowledge'} 没有 financials.json，先跑 finance_extract.py")
+        raise SystemExit(f"{Path(root) / market / stock / 'knowledge'} 没有 financials.json，先跑 facts.py")
 
     series: dict[int, dict] = {}
     for fin in reports:

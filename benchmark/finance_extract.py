@@ -15,7 +15,8 @@ import json
 import sys
 from pathlib import Path
 
-from cagent.finance_identity import duplicate_roles, number, roles_from_rows, verify
+from cagent.checks import verify
+from cagent.fields import duplicate_roles, number, roles_from_rows
 
 CASES_PATH = Path(__file__).parent / "cases" / "finance_extract.json"
 DEFAULT_ROOT = Path(__file__).resolve().parents[1] / ".cagent"
@@ -97,7 +98,7 @@ def evaluate(case: dict, root: Path, tol: float) -> int:
     print(f"\n案例 {case['id']}（{case['year']}）")
     print(f"  产物 {path}")
     if not path.exists():
-        print("  ✗ 无产物，先跑 cagent/finance_extract.py 或加 --live")
+        print("  ✗ 无产物，先跑 cagent/facts.py 或加 --live")
         return 1
 
     artifact = json.loads(path.read_text(encoding="utf-8"))
@@ -142,11 +143,11 @@ def main() -> None:
     root = Path(args.root)
 
     if args.live:
-        from cagent.agent import Agent
-        from cagent.finance_extract import extract_financials
+        from cagent.facts import extract_financials
+        from cagent.llm import LLM
         from cagent.scraper.lakehouse_index import atomic_write
 
-        agent = Agent(trace=True)
+        agent = LLM(trace=True)
         for case in cases:
             md = root / case["market"] / case["stock"] / "derived" / case["file"]
             financials = extract_financials(agent, md, root, case["market"], case["stock"])

@@ -13,7 +13,7 @@ import logging
 import sys
 from pathlib import Path
 
-from cagent.agent import Agent
+from cagent.llm import LLM
 from cagent.wiki_business import gen_business
 from cagent.wiki_decisions import gen_decisions
 from cagent.wiki_finance import gen_finance
@@ -42,7 +42,7 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     root = Path(args.root)
-    agent = Agent(trace=True)
+    agent = LLM(trace=True)
 
     docs = []
     for name, gen in _MODULES:
