@@ -105,14 +105,6 @@ def _bullets(text: str) -> str:
     return re.sub(r"(?<=[。；;])\s+(?=[-*] )", "\n", text.strip())
 
 
-def _distill(agent: Agent, prompt: str, chunks: list[str]) -> str:
-    """蒸馏一段叙述：全文装得下就一次性直读（避免逐块归并丢内容），装不下退回逐块归并。"""
-    text = "\n".join(chunks)
-    if len(agent.tokenize(text)) < agent.n_ctx() - 16384:
-        return agent.chat_prompt(f"{prompt}\n\n<report>\n{text}\n</report>").strip()
-    return agent.chat_reduce_chunks_loop_once(prompt, chunks)
-
-
 def gen_decisions(agent: Agent, stock: str, market: str, root: Path) -> str:
     derived = root / market / stock / "derived"
     mds = sorted(derived.glob("*.md"))
@@ -131,8 +123,8 @@ def gen_decisions(agent: Agent, stock: str, market: str, root: Path) -> str:
         chunks = [chunk for i in picked for chunk in toc.chapter_text_chunk(i)]
 
         logger.info(f"{year} gen …")
-        judge = _bullets(_distill(agent, _judge_prompt(), chunks))
-        decide = _bullets(_distill(agent, _decide_prompt(), chunks))
+        judge = _bullets(agent.chat_distill(_judge_prompt(), chunks))
+        decide = _bullets(agent.chat_distill(_decide_prompt(), chunks))
         if not judge or not decide:
             raise ValueError(f"{year} decisions 分析异常")
 

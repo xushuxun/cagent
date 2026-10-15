@@ -1,12 +1,22 @@
-"""finance_extract 模块：财报数字知识层
+"""finance_extract 模块：财报数字层
 
-从年报 md 确定性定位并解析合并财务报表（资产负债表 / 利润表 / 现金流量表 / 股东权益变动表 /
-现金流量表补充资料）的 HTML 表格；行项目 → 标准字段的映射交给模型（每份年报每类表映射一次并
-缓存），产物 knowledge/<公告>/financials.json。数字一律程序直解，模型只负责定位与标注，不得改数。
+模型提表、程序校验。流程：LLM 选章节 → 程序出紧凑表清单 → LLM 挑合并报表 → LLM 逐表提数并标注 role →
+程序跑会计恒等式（finance_identity）→ 不通过则把失败等式连原表回喂定向重取（≤2 轮）。
+数字一律取原表值，模型禁止计算、禁止改数；恒等式不通过的数字进 unresolved，下游不得当作已核实。
+
+产物：<root>/<market>/<stock>/knowledge/<公告stem>/financials.json（幂等缓存），字段：
+    year/source/file/pages/picked  溯源与断点
+    tables{kind: {title, consolidated, unit, pages, columns, rows[{label, role, values}]}}  原表行，values 按 columns 对齐
+    roles / roles_prior            程序从 rows 归集出的本期、上期口径 {role: 元}
+    complete/missing_kinds           产物是否完整（--kind 单抽会留下残缺年份，序列层要认这个标记）
+    identities[{id, desc, status, delta, missing}]  恒等式结论（pass/fail/skip/diff）
+    unresolved                     fail 的恒等式 id，这些数字下游不得当作已核实
+只产内容，不管 UI；分析层见 wiki_finance.py。
 
 用法：
     uv run cagent/finance_extract.py --stock 601633 --market cn
     uv run cagent/finance_extract.py --stock 601633 --market cn --force
+    uv run cagent/finance_extract.py --stock 601633 --market cn --kind income    # 只重取一张表，其余沿用
 """
 
 import argparse
@@ -14,307 +24,330 @@ import json
 import logging
 import re
 import sys
-from html.parser import HTMLParser
+import textwrap
 from pathlib import Path
-from typing import TypedDict
 
 from cagent.agent import Agent
-from cagent.chunk import report_year, split_pages
+from cagent.chunk import Toc, report_year, split_pages
+from cagent.finance_identity import IDENTITIES, ROLES_BY_KIND, Check, check_report, duplicate_roles, roles_from_rows, rollforward_check, verify
 from cagent.scraper.lakehouse_index import atomic_write
 
 logger = logging.getLogger(__name__)
 
 _TABLE_RE = re.compile(r"<table.*?</table>", re.DOTALL)
+_TAG_RE = re.compile(r"<[^>]+>")
 
-# 报表标题行：合并*表（含 - 续）开启收集，公司/母公司*表或其他标题行结束收集
-_HEADING_RE = re.compile(r"^(合并(?:及公司)?|公司|母公司)?(资产负债表|利润表|现金流量表|(?:股东|所有者)权益变动表)(?:\s*-\s*续)?$")
+KINDS = ("balance", "income", "cashflow", "supplement", "equity")
 
-_STMT_KEY = {
-    "资产负债表": "balance",
-    "利润表": "income",
-    "现金流量表": "cashflow",
-    "股东权益变动表": "equity",
-    "所有者权益变动表": "equity",
+_IDENTITY_BY_ID = {identity.id: identity for identity in IDENTITIES}
+
+_KIND_TITLE = {
+    "balance": "合并资产负债表",
+    "income": "合并利润表",
+    "cashflow": "合并现金流量表",
+    "supplement": "现金流量表补充资料（将净利润调节为经营活动现金流量）",
+    "equity": "合并股东权益变动表",
 }
 
 
-class RawTable(TypedDict):
-    page: int
-    rows: list[list[str]]
+def _cell_text(html: str) -> str:
+    return _TAG_RE.sub("", html).replace("&nbsp;", " ").replace("&amp;", "&").strip()
 
 
-def _parse_rows(html: str) -> list[list]:
-    """HTML 表格 → 行列表 [[文本, rowspan, colspan], ...]，未展开合并单元格。"""
-
-    class _Parser(HTMLParser):
-        def __init__(self) -> None:
-            super().__init__()
-            self.rows: list[list[list]] = []  # cell = [text_parts, rowspan, colspan]
-            self._row: list[list] | None = None
-            self._cell: list[str] | None = None
-
-        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-            if tag == "tr":
-                self._row = []
-            elif tag in ("td", "th") and self._row is not None:
-                a = dict(attrs)
-                self._row.append([[], int(a.get("rowspan") or 1), int(a.get("colspan") or 1)])
-                self._cell = self._row[-1][0]
-
-        def handle_data(self, data: str) -> None:
-            if self._cell is not None:
-                self._cell.append(data)
-
-        def handle_endtag(self, tag: str) -> None:
-            if tag in ("td", "th") and self._cell is not None:
-                self._cell = None
-            elif tag == "tr" and self._row is not None:
-                self.rows.append(self._row)
-                self._row = None
-
-    p = _Parser()
-    p.feed(html)
-    return [[["".join(c[0]).strip(), c[1], c[2]] for c in row] for row in p.rows]
+def _table_title(page_text: str, position: int) -> str:
+    """表格上方最近的几行文本——年报里这就是「合并资产负债表」这类表名。"""
+    lines = [line.strip() for line in page_text[:position].splitlines() if line.strip()]
+    return " / ".join(lines[-3:])[:60]
 
 
-def _expand(rows: list[list]) -> list[list[str]]:
-    """展开 rowspan/colspan 为规则网格。"""
-    grid: list[list[str]] = []
-    active: dict[int, list] = {}  # col -> [剩余行数, 文本]
-    for row in rows:
-        out: list[str] = []
-        col = 0
-        for text, rowspan, colspan in row:
-            while active.get(col, [0])[0] > 0:
-                out.append(active[col][1])
-                active[col][0] -= 1
-                col += 1
-            for k in range(colspan):
-                out.append(text)
-                if rowspan > 1:
-                    active[col + k] = [rowspan - 1, text]
-            col += colspan
-        grid.append(out)
-    return grid
+def _rows_of(html: str) -> list[list[str]]:
+    """HTML 表格 → 单元格文本网格（不展开合并单元格，交给模型看原文）。"""
+    return [[_cell_text(cell) for cell in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.DOTALL)] for row in re.findall(r"<tr.*?</tr>", html, re.DOTALL)]
 
 
-_NUM_RE = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+\.\d+")
+def table_inventory(pages: list[str], page_range: range) -> list[dict]:
+    """候选表清单：页码、表序号、行数、表名、前几个行项目。程序只做切片，判断交给模型。"""
+    inventory = []
+    for page_no in page_range:
+        page_text = pages[page_no - 1]
+        for index, table in enumerate(_TABLE_RE.finditer(page_text), 1):
+            grid = [row for row in _rows_of(table.group(0)) if row]
+            if not grid:
+                continue
+            inventory.append(
+                {
+                    "id": f"{page_no}:{index}",
+                    "page": page_no,
+                    "index": index,
+                    "rows": len(grid),
+                    "title": _table_title(page_text, table.start()),
+                    "labels": [row[0] for row in grid[1:6]],
+                    "html": table.group(0),
+                }
+            )
+    return inventory
 
 
-def _norm_num(s: str) -> str:
-    """千分位去逗号；(x) 负数 → -x；'-'/空 → 空串。其余文本原样返回。"""
-    s = s.strip()
-    if not s or s == "-":
-        return ""
-    neg = s.startswith("(") and s.endswith(")")
-    core = s[1:-1] if neg else s
-    if _NUM_RE.fullmatch(core):
-        v = core.replace(",", "")
-        return ("-" + v) if neg else v
-    return s
+def _inventory_text(inventory: list[dict]) -> str:
+    return "\n".join(
+        f'<table id="{item["id"]}" rows="{item["rows"]}" title="{item["title"]}">{"|".join(item["labels"])}</table>' for item in inventory
+    )
 
 
-def locate_statement_tables(text: str) -> dict[str, list[RawTable]]:
-    """在年报 md 中定位合并报表表格，返回 {statement: [{page, rows}, ...]}（rows 已归一化数值）。
+def pick_tables(agent: Agent, inventory: list[dict]) -> dict[str, list[str]]:
+    """让模型从清单里挑出各张合并报表（排除母公司口径），返回 {kind: [table id]}。"""
+    listing = "\n".join(f"- {kind}：{_KIND_TITLE[kind]}" for kind in KINDS)
+    prompt = textwrap.dedent(f"""
+        <requirement>
+        下面是某上市公司年报里若干表格的清单（id=页码:表序号，title=表格上方最近的文本，内容是前几个行项目）。
+        为下列每类合并报表挑出对应的表 id：
 
-    按页扫描标题行：合并资产负债表/利润表/现金流量表/权益变动表（含 - 续）开启收集，
-    遇到公司/母公司报表或其他标题行结束；现金流量表补充资料单独取附注中第一个。
-    """
-    pages = split_pages(text)
-    found: dict[str, list[RawTable]] = {}
-    current: str | None = None
-    for page_no, page in enumerate(pages, 1):
-        for line in page.splitlines():
-            m = _HEADING_RE.match(line.strip())
-            if m:
-                current = _STMT_KEY[m.group(2)] if m.group(1) and m.group(1).startswith("合并") else None
-        for tm in _TABLE_RE.finditer(page):
-            if current:
-                rows = [[_norm_num(c) for c in r] for r in _expand(_parse_rows(tm.group(0)))]
-                found.setdefault(current, []).append({"page": page_no, "rows": rows})
-    for page_no, page in enumerate(pages, 1):
-        idx = page.find("现金流量表补充资料")
-        if idx == -1:
-            continue
-        tm = _TABLE_RE.search(page, idx)
-        if tm:
-            rows = [[_norm_num(c) for c in r] for r in _expand(_parse_rows(tm.group(0)))]
-            found["supplement"] = [{"page": page_no, "rows": rows}]
-            break
-    return found
+        {listing}
+
+        只选合并口径，绝不选母公司（公司）口径；同一张表跨页时把各页的表都选上；
+        宁缺毋滥：表名或标题里带「公司」「母公司」的一律不选，附注里的明细表（账龄、减值、担保等）也不选；
+        找不到的类别返回空数组。只输出 id，不要解释。
+        </requirement>
+
+        <tables>
+        {_inventory_text(inventory)}
+        </tables>""").strip()
+    return agent.chat_json(prompt, {"type": "object", "properties": {kind: {"type": "array", "items": {"type": "string"}} for kind in KINDS}, "required": list(KINDS)})
 
 
-# 标准字段：字段名 → 中文释义，交给模型按释义从原始行里找对应行项目
-
-_INCOME_FIELDS = {
-    "revenue": "营业总收入（或营业收入）",
-    "cogs": "营业成本",
-    "taxes_surcharges": "税金及附加",
-    "selling_exp": "销售费用",
-    "admin_exp": "管理费用",
-    "rd_exp": "研发费用",
-    "fin_exp": "财务费用（负数表示净收益）",
-    "interest_exp": "其中：利息费用",
-    "other_income": "其他收益",
-    "invest_income": "投资收益",
-    "fv_change_income": "公允价值变动收益",
-    "credit_impairment_loss": "信用减值损失（按表格原符号，负数=损失）",
-    "asset_impairment_loss": "资产减值损失（按表格原符号，负数=损失）",
-    "asset_disposal_income": "资产处置收益",
-    "operating_profit": "营业利润",
-    "total_profit": "利润总额",
-    "income_tax": "所得税费用",
-    "net_profit": "净利润",
-    "net_profit_parent": "归属于母公司股东的净利润",
-    "minority_profit": "少数股东损益",
-}
-
-_BALANCE_FIELDS = {
-    "total_assets": "资产总计",
-    "total_liabilities": "负债合计",
-    "total_equity": "股东权益合计",
-    "equity_parent": "归属于母公司股东权益合计",
-    "minority_equity": "少数股东权益",
-    "monetary_funds": "货币资金",
-    "trading_fin_assets": "交易性金融资产",
-    "notes_receivable": "应收票据",
-    "accounts_receivable": "应收账款",
-    "receivables_financing": "应收款项融资",
-    "prepayments": "预付款项",
-    "other_receivables": "其他应收款",
-    "inventory": "存货",
-    "contract_assets": "合同资产",
-    "fixed_assets": "固定资产",
-    "construction_in_progress": "在建工程",
-    "right_of_use_assets": "使用权资产",
-    "intangible_assets": "无形资产",
-    "development_exp": "开发支出",
-    "goodwill": "商誉",
-    "long_term_equity_invest": "长期股权投资",
-    "short_term_borrowings": "短期借款",
-    "long_term_borrowings": "长期借款",
-    "bonds_payable": "应付债券",
-    "lease_liabilities": "租赁负债",
-    "notes_payable": "应付票据",
-    "accounts_payable": "应付账款",
-    "contract_liabilities": "合同负债",
-    "payroll_payable": "应付职工薪酬",
-    "tax_payable": "应交税费",
-    "other_payables": "其他应付款",
-    "share_capital": "股本",
-    "treasury_stock": "减:库存股",
-    "retained_earnings": "未分配利润",
-}
-
-_CASHFLOW_FIELDS = {
-    "ocf": "经营活动产生的现金流量净额",
-    "icf": "投资活动产生的现金流量净额（负数=净流出）",
-    "financing_cf": "筹资活动产生的现金流量净额（负数=净流出）",
-    "capex": "购建固定资产、无形资产和其他长期资产支付的现金",
-    "cash_from_sales": "销售商品、提供劳务收到的现金",
-    "dividend_interest_paid": "分配股利、利润或偿付利息支付的现金",
-    "cash_end_balance": "年末现金及现金等价物余额",
-}
-
-_SUPPLEMENT_FIELDS = {
-    "da_fixed": "固定资产折旧（本期数）",
-    "da_rou": "使用权资产折旧（本期数）",
-    "da_intangible": "无形资产摊销（本期数）",
-    "da_lt_deferred": "长期待摊费用摊销（本期数）",
-    "da_inv_property": "投资性房地产折旧及摊销（本期数，表中没有该行则填 null）",
-}
-
-_EQUITY_FIELDS = {
-    "dividend": "对股东的分配：取利润分配部分『3.对股东的分配』行、未分配利润列的绝对值；只取第一期间（本年度）表，忽略上年期间表",
-}
-
-_FIELDS_BY_STMT = {
-    "income": _INCOME_FIELDS,
-    "balance": _BALANCE_FIELDS,
-    "cashflow": _CASHFLOW_FIELDS,
-    "supplement": _SUPPLEMENT_FIELDS,
-    "equity": _EQUITY_FIELDS,
-}
-
-_PERIOD_HINT = {
-    "income": "只取本期数（第一数据列，即本年度列）",
-    "balance": "只取本期数（第一数据列，即期末列；附注列不是数据列）",
-    "cashflow": "只取本期数（第一数据列，即本年度列）",
-    "supplement": "只取本期数（第一数据列，即本年度列）",
-    "equity": "只取第一期间（本年度）表；dividend 取利润分配部分『对股东的分配』行、未分配利润列的绝对值，忽略上年期间表",
-}
-
-_STMT_TITLE = {
-    "income": "利润表",
-    "balance": "资产负债表",
-    "cashflow": "现金流量表",
-    "supplement": "现金流量表补充资料",
-    "equity": "股东权益变动表",
-}
+def _roles_text(kind: str) -> str:
+    return "\n".join(f"- {role}：{desc}" for role, desc in ROLES_BY_KIND[kind].items())
 
 
-def _map_schema(fields: dict[str, str]) -> dict:
+def _extract_schema() -> dict:
     return {
         "type": "object",
-        "properties": {k: {"type": ["number", "null"]} for k in fields},
-        "required": list(fields),
+        "properties": {
+            "consolidated": {"type": "boolean"},
+            "title": {"type": "string"},
+            "unit": {"type": "string"},
+            "pages": {"type": "array", "items": {"type": "integer"}},
+            "columns": {"type": "array", "items": {"type": "object", "properties": {"label": {"type": "string"}, "period": {"type": "string"}}, "required": ["label", "period"]}},
+            "rows": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "label": {"type": "string"},
+                        "role": {"type": "string"},
+                        "values": {"type": "array", "items": {"type": ["number", "null"]}},
+                    },
+                    "required": ["label", "role", "values"],
+                },
+            },
+        },
+        "required": ["consolidated", "title", "unit", "pages", "columns", "rows"],
     }
 
 
-def map_statement(agent: Agent, stmt: str, tables: list[RawTable]) -> dict:
-    """让模型把一类报表的原始行映射到标准字段。只映射不改数，缺失填 null。"""
-    fields = _FIELDS_BY_STMT[stmt]
-    if not tables:
-        return {k: None for k in fields}
-    listing = "\n".join(f'<table page="{t["page"]}">\n{json.dumps(t["rows"], ensure_ascii=False)}\n</table>' for t in tables)
-    prompt = f"""
-<requirement>
-你在做上市公司年报的财务报表科目映射。下面是合并{_STMT_TITLE[stmt]}的原始表格行（JSON，单元格数值已归一化：无千分位逗号，负数为前缀负号，空串=无）。
-把行项目映射到 <fields> 的标准字段，{_PERIOD_HINT[stmt]}。
-缺失填 null。只抄录原表的数，禁止计算、禁止估算、禁止改数。单位：人民币元。
-</requirement>
+def _equity_prompt(tables_html: str) -> str:
+    return textwrap.dedent(f"""
+        <requirement>
+        你在读合并股东权益变动表。这张表的列是权益构成（股本、资本公积、未分配利润、股东权益合计……），
+        不是期间；两期数据是上下相接的两张表（本年金额一张、上年金额一张）。
 
-<fields>
-{json.dumps(fields, ensure_ascii=False, indent=1)}
-</fields>
+        只提取两笔业务事项，每行 values 两个数：第一个是本期（本年金额表）、第二个是上期（上年金额表）：
+        - dividend：利润分配下「对股东的分配」行，取**未分配利润列**的绝对值（不是股东权益合计列）
+        - capital_raised：「所有者投入和减少资本」行，取归母权益小计列；表中没有小计列时取股东权益合计列
 
-{listing}
-"""
-    result = agent.chat_json(prompt, _map_schema(fields))
-    return {k: result.get(k) for k in fields}
+        - 抄录原表数值，禁止计算、禁止改数；千分位逗号去掉，括号负数改成负号
+        - label 照抄原表行标签，unit 照抄原表单位；找不到的行 values 填 [null, null]
+        - columns 只放本期、上期两项；rows 只放上面这两行
+        </requirement>
+
+        <tables>
+        {tables_html}
+        </tables>""").strip()
 
 
-def extract_financials(agent: Agent, md_path: str | Path, root: Path) -> dict:
-    """一份年报 md → knowledge/<公告>/financials.json，返回解析后的 dict。"""
+def _extract_prompt(kind: str, tables_html: str) -> str:
+    return textwrap.dedent(f"""
+        <requirement>
+        你在把上市公司年报的{_KIND_TITLE[kind]}抄成结构化数据。原表在 <tables> 里，跨页的续表已按顺序拼好。
+
+        - 若 <tables> 里混进了母公司（公司）报表或其他无关表，只抄合并口径那张，其余忽略
+        - consolidated 填 true 仅当你抄的是合并报表；母公司（公司）报表填 false
+
+        - 抄录原表数值，禁止计算、禁止改数、禁止四舍五入；原表保留几位就抄几位
+        - 千分位逗号去掉，括号负数改成负号（如 (1,234.5) → -1234.5）
+        - 只把数据列放进 columns：附注列、序号列、单位列都不是数据列；每行 values 按 columns 顺序对齐
+        - 本期列在前、上期列在后，列名照抄原表（含「经审计」「已重述」等字样）
+        - 原表单元格是「-」「—」或空白时：该科目本期确实为零（可由合计行勾稽印证，如少数股东损益、少数股东权益）填 0；
+          原表根本没这一行、或该数不适用则填 null
+        - 每行都抄，保持原表顺序；<page> 上标了原表行数 rows=N，拼接后的 rows 条数应与各表行数之和相当，
+          分类标题行可略过，数据行一行都不能漏
+        - role 只从下面的词表里选，抄不到对应科目的行 role 填空字符串
+        - 词表里注明「每行都标此 role」的除外，其余 role 每行只标一次：合计行与其下「其中:xxx」明细行不要标同一个 role
+        - unit 填原表单位（元/千元/百万元），照抄原表
+        </requirement>
+
+        <roles>
+        {_roles_text(kind)}
+        </roles>
+
+        <tables>
+        {tables_html}
+        </tables>""").strip()
+
+
+def _repair_prompt(kind: str, tables_html: str, table: dict, failures: list[Check], roles: dict[str, float]) -> str:
+    lines = []
+    for check in failures:
+        terms = " ".join(f"{sign:+.0f}×{role}={roles.get(role, 0.0):,.2f}" for role, sign in _IDENTITY_BY_ID[check.id].terms)
+        lines.append(f"- {check.id}（{check.desc}）当前 Δ={check.delta:,.2f}\n  {terms}")
+    return textwrap.dedent(f"""
+        <requirement>
+        你把年报的{_KIND_TITLE[kind]}抄进 <current>，但会计恒等式校验不通过：
+
+        {"\n".join(lines)}
+
+        请对照 <tables> 里的原表逐行核对，纠正错抄、漏抄、串列的数，重新输出整张表。
+        仍然禁止计算：所有数字必须能在原表里逐字找到。
+        </requirement>
+
+        <roles>
+        {_roles_text(kind)}
+        </roles>
+
+        <current>
+        {json.dumps(table, ensure_ascii=False)}
+        </current>
+
+        <tables>
+        {tables_html}
+        </tables>""").strip()
+
+
+def _consolidated_check(kind: str, table: dict) -> Check:
+    """口径守卫：母公司报表自身也满足全部恒等式，抄错了恒等式抓不住，只能靠口径自报挡一道。"""
+    ok = table.get("consolidated") is True
+    return Check(f"scope.{kind}", "抄的是合并报表口径（母公司报表同样平，靠这一条挡）", "pass" if ok else "fail")
+
+
+def _tables_html(inventory: list[dict], ids: list[str]) -> str:
+    parts = []
+    for table_id in ids:
+        item = next((i for i in inventory if i["id"] == table_id), None)
+        if item is None:
+            logger.warning(f"清单里没有表 {table_id}，跳过")
+            continue
+        parts.append(f'<page no="{item["page"]}" title="{item["title"]}" rows="{item["rows"]}">\n{item["html"]}\n</page>')
+    return "\n\n".join(parts)
+
+
+def extract_kind(agent: Agent, kind: str, inventory: list[dict], ids: list[str], max_repair: int = 2) -> tuple[dict | None, list[Check]]:
+    """抽一张表并用恒等式反复校验，返回 (表, 校验结果)。
+
+    权益变动表只提两笔事实、且要用到利润表与资产负债表的数才能校验，故不走这张表自己的重取循环，
+    残差在跨表校验里报。
+    """
+    html = _tables_html(inventory, ids)
+    if not html:
+        return None, []
+    prompt = _equity_prompt(html) if kind == "equity" else _extract_prompt(kind, html)
+    table = agent.chat_json(prompt, _extract_schema())
+    if kind == "equity":
+        return table, []
+    for attempt in range(max_repair + 1):
+        roles = roles_from_rows(table.get("rows") or [], unit=table.get("unit") or "元")
+        checks = [check for check in verify(roles) if check.id.startswith(kind)]
+        failures = [check for check in checks if check.status == "fail"]
+        if not failures:
+            return table, checks
+        if attempt == max_repair:
+            logger.warning(f"{kind} 仍有 {len(failures)} 条恒等式不通过：{[c.id for c in failures]}")
+            return table, checks
+        logger.info(f"{kind} 第 {attempt + 1} 次重取：{[c.id for c in failures]}")
+        table = agent.chat_json(_repair_prompt(kind, html, table, failures, roles), _extract_schema())
+    return table, checks
+
+
+def extract_financials(agent: Agent, md_path: str | Path, root: Path, market: str = "", stock: str = "", kinds: tuple[str, ...] = KINDS, base: dict | None = None) -> dict:
+    """一份年报 md → financials.json，返回解析后的 dict。
+
+    kinds 限定只重取哪几张表（迭代单张表用）；base 是已有产物，未重取的表与恒等式结论沿用。
+    """
     md_path = Path(md_path)
-    found = locate_statement_tables(md_path.read_text(encoding="utf-8"))
-    for required in ("balance", "income", "cashflow"):
-        if required not in found:
-            raise ValueError(f"{md_path.name} 未定位到 {required} 报表表格")
+    toc = Toc(agent, md_path)
+    pages = split_pages(toc.text)
 
-    year = report_year(agent, md_path)
-    financials: dict = {"year": year, "source": {"file": md_path.name, "pages": {}}}
-    for stmt in ("income", "balance", "cashflow", "supplement", "equity"):
-        tables = found.get(stmt, [])
-        if tables:
-            financials["source"]["pages"][stmt] = [t["page"] for t in tables]
-        financials[stmt] = map_statement(agent, stmt, tables)
-        logger.info(f"{md_path.name} {stmt}: {sum(1 for v in financials[stmt].values() if v is not None)}/{len(financials[stmt])} 个字段")
+    task = "找出合并财务报表（合并资产负债表、合并利润表、合并现金流量表、所有者权益变动表）以及财务报表附注所在章节"
+    picked = toc.pick_chapters(toc.chapters, task)
+    page_range = range(min(toc.range(toc.chapters[i])[0] for i in picked), max(toc.range(toc.chapters[i])[1] for i in picked) + 1)
+    logger.info(f"财务报告章节: p.{page_range.start}-{page_range.stop - 1}（选中 {[toc.chapters[i]['title'] for i in picked]}）")
 
-    out_dir = Path(root) / "knowledge" / md_path.stem
-    out_dir.mkdir(parents=True, exist_ok=True)
-    atomic_write(out_dir / "financials.json", (json.dumps(financials, ensure_ascii=False, indent=1) + "\n").encode("utf-8"))
-    logger.info(f"输出: {out_dir / 'financials.json'}")
+    inventory = table_inventory(pages, page_range)
+    logger.info(f"候选表 {len(inventory)} 张，清单 {len(_inventory_text(inventory))} 字符")
+    picked_tables = (base or {}).get("source", {}).get("picked") or pick_tables(agent, inventory)
+    logger.info(f"选中: {{{', '.join(f'{k}: {v}' for k, v in picked_tables.items())}}}")
+
+    tables: dict[str, dict] = {kind: table for kind, table in (base or {}).get("tables", {}).items() if kind not in kinds}
+    all_checks: list[Check] = [Check(**check) for check in (base or {}).get("identities", []) if check["id"].split(".")[0] not in kinds and not check["id"].startswith(("cross", "equity"))]
+    for kind in kinds:
+        ids = [i for i in picked_tables.get(kind) or [] if isinstance(i, str)]
+        if not ids:
+            logger.warning(f"{kind}: 未选中任何表")
+            continue
+        table, checks = extract_kind(agent, kind, inventory, ids)
+        if table is None:
+            continue
+        tables[kind] = table
+        checks = [*checks, _consolidated_check(kind, table)]
+        all_checks.extend(checks)
+        rows = table.get("rows") or []
+        roles = roles_from_rows(rows, unit=table.get("unit") or "元")
+        logger.info(f"{kind}: {len(rows)} 行, {len(roles)} 个 role\n{check_report(checks)}")
+        for role, labels in duplicate_roles(rows).items():
+            logger.warning(f"{kind}: role {role} 被多行标注 {labels}，只取第一行")
+
+    roles: dict[str, float] = {}
+    roles_prior: dict[str, float] = {}
+    for table in tables.values():
+        rows = table.get("rows") or []
+        unit = table.get("unit") or "元"
+        roles.update(roles_from_rows(rows, unit=unit))
+        roles_prior.update(roles_from_rows(rows, unit=unit, column=1))
+    cross_checks = [check for check in verify(roles) if check.id.startswith("cross")]
+    cross_checks.append(rollforward_check(roles, roles_prior))
+    all_checks.extend(cross_checks)
+
+    unresolved = [check.id for check in all_checks if check.status == "fail"]
+    missing_kinds = [kind for kind in KINDS if kind not in tables]
+    financials = {
+        "year": report_year(agent, md_path),
+        "source": {
+            "market": market,
+            "stock": stock,
+            "file": md_path.name,
+            "pages": {kind: table.get("pages") for kind, table in tables.items()},
+            "picked": picked_tables,
+        },
+        "unit": next((table.get("unit") for table in tables.values() if table.get("unit")), "元"),
+        "complete": not missing_kinds,
+        "missing_kinds": missing_kinds,
+        "tables": tables,
+        "roles": roles,
+        "roles_prior": roles_prior,
+        "identities": [check.__dict__ for check in all_checks],
+        "unresolved": unresolved,
+    }
+    logger.info(f"跨表校验:\n{check_report(cross_checks)}")
     return financials
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S", stream=sys.stderr)
-    parser = argparse.ArgumentParser(description="finance_extract：财报数字知识层")
+    parser = argparse.ArgumentParser(description="finance_extract：财报数字层")
     parser.add_argument("--stock", default="601633")
     parser.add_argument("--market", default="cn", choices=["cn", "hk"])
     parser.add_argument("--root", default=str(Path(__file__).resolve().parents[1] / ".cagent"))
-    parser.add_argument("--force", action="store_true")
+    parser.add_argument("--force", action="store_true", help="重取已存在的 financials.json")
+    parser.add_argument("--kind", action="append", choices=KINDS, help="只重取某几张表（可重复），其余沿用已有产物")
     args = parser.parse_args()
 
     derived = Path(args.root) / args.market / args.stock / "derived"
@@ -322,18 +355,27 @@ def main() -> None:
     if not mds:
         raise SystemExit(f"{derived} 没有年报 md，先跑 ocr/cli.py")
 
+    kinds = tuple(args.kind) if args.kind else KINDS
     agent = Agent(trace=True)
-    failed = []
-    for md in mds:
-        out = Path(args.root) / args.market / args.stock / "knowledge" / md.stem / "financials.json"
-        if out.exists() and not args.force:
-            logger.info(f"跳过（已存在）: {md.name}")
+    failed: list[str] = []
+    for md_path in mds:
+        out_path = Path(args.root) / args.market / args.stock / "knowledge" / md_path.stem / "financials.json"
+        if out_path.exists() and not args.force and not args.kind:
+            logger.info(f"跳过（已存在）: {out_path}")
             continue
+        base = json.loads(out_path.read_text(encoding="utf-8")) if out_path.exists() else None
+        if args.kind and base is None:
+            logger.warning(f"{out_path} 不存在，只抽 {kinds} 会得到不完整的产物")
         try:
-            extract_financials(agent, md, Path(args.root) / args.market / args.stock)
+            financials = extract_financials(agent, md_path, Path(args.root), args.market, args.stock, kinds=kinds, base=base)
         except Exception:
-            logger.exception(f"提取失败: {md.name}")
-            failed.append(md.name)
+            logger.exception(f"提取失败: {md_path.name}")
+            failed.append(md_path.name)
+            continue
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write(out_path, (json.dumps(financials, ensure_ascii=False, indent=1) + "\n").encode("utf-8"))
+        logger.info(f"输出: {out_path}（{financials['year']} 年，未通过恒等式 {len(financials['unresolved'])} 条）")
+
     if failed:
         logger.error(f"失败 {len(failed)} 份: {failed}")
         sys.exit(1)

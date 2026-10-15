@@ -99,6 +99,13 @@ class Agent:
                 result = resp["result"]
         return result.strip()
 
+    def chat_distill(self, prompt: str, chunks: list[str]) -> str:
+        """按上下文预算选路线：全文装得下就一次性直读（避免逐块归并丢细节），装不下退回逐块归并。"""
+        text = "\n".join(chunks)
+        if len(self.tokenize(text)) < self.n_ctx() - 16384:
+            return self.chat_prompt(f"{prompt}\n\n<report>\n{text}\n</report>").strip()
+        return self.chat_reduce_chunks_loop_once(prompt, chunks)
+
     def chat_reduce_chunks_loop_once(self, prompt: str, chunks: list[str]) -> str:
         result = self.chat_reduce_chunks(prompt, chunks)
         return self.chat_reduce_chunks(prompt, chunks, result)
