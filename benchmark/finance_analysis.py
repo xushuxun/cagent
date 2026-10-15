@@ -114,10 +114,18 @@ def evaluate(case: dict, output_root: Path, root: Path) -> int:
     if len(violations) > limit:
         problems.append(f"越界数字 {len(violations)} 个")
 
-    missing_terms = [term for term in case.get("required_terms", []) if term not in doc]
+    # 只在拆解正文里查必备内容：整篇匹配会被数据表的表头蒙混过去
+    missing_terms = [term for term in case.get("required_terms", []) if term not in prose]
     print(f"  必备内容 {len(case.get('required_terms', [])) - len(missing_terms)}/{len(case.get('required_terms', []))} 出现")
     if missing_terms:
         problems.append(f"拆解缺内容：{'、'.join(missing_terms)}")
+
+    # 维度标题由程序写死，少一条说明装配坏了，与模型笔下松紧无关
+    headings = re.findall(r"(?m)^### (\d+)\. ", prose)
+    expected = case.get("dimensions", 0)
+    print(f"  维度标题 {len(headings)} 个，期望 {expected}")
+    if expected and len(headings) != expected:
+        problems.append(f"维度标题 {len(headings)} 个，期望 {expected}")
 
     for line in problems:
         print(f"  ✗ {line}")

@@ -29,6 +29,7 @@ class Identity:
     terms: tuple[tuple[str, float], ...]
     soft: bool = False
     optional: tuple[str, ...] = ()   # 原表可能没有的行：缺了按 0 计
+    sense: str = "="                 # "=" 加权和应为 0；"<=" 加权和应不大于 0（如 跌价准备 − 存货 ≤ 0）
 
 
 @dataclass(frozen=True)
@@ -41,7 +42,8 @@ class Check:
 
 
 # role → 中文释义。抽取层按 kind 分组喂给模型，模型据此标注行项目。
-# 分两类：锚点行进恒等式、有担保；明细行无恒等式担保，供分析层（周转率、冗余资产、低报资产）取用。
+# 只保留固定字段：准则强制列报、且挂着判据（进恒等式、或供周转率/杠杆/对账用）。
+# 公司特有的明细不做字段，重构后由"按需明细清单 + 逐字校验"承载。
 BALANCE_ROLES = {
     "total_current_assets": "流动资产合计",
     "total_noncurrent_assets": "非流动资产合计",
@@ -54,22 +56,8 @@ BALANCE_ROLES = {
     "total_equity": "所有者权益合计（股东权益合计）",
     "monetary_funds": "货币资金",
     "accounts_receivable": "应收账款",
-    "notes_receivable": "应收票据",
-    "receivables_financing": "应收款项融资",
     "other_receivables": "其他应收款（大股东占款一类冗余资产的信号）",
-    "prepayments": "预付款项",
     "inventory": "存货",
-    "fixed_assets": "固定资产",
-    "construction_in_progress": "在建工程",
-    "right_of_use_assets": "使用权资产",
-    "intangible_assets": "无形资产",
-    "development_exp": "开发支出（研发资本化形成的在研项目）",
-    "goodwill": "商誉",
-    "investment_property": "投资性房地产（低报资产的常见藏身处）",
-    "accounts_payable": "应付账款",
-    "notes_payable": "应付票据",
-    "contract_assets": "合同资产",
-    "contract_liabilities": "合同负债",
     "short_term_borrowings": "短期借款",
     "long_term_borrowings": "长期借款",
     "bonds_payable": "应付债券",
@@ -85,7 +73,6 @@ INCOME_ROLES = {
     "admin_exp": "管理费用",
     "rd_exp": "研发费用",
     "fin_exp": "财务费用（净收益为负）",
-    "interest_expense": "财务费用中的利息费用（其中项）",
     "other_income": "其他收益",
     "invest_income": "投资收益",
     "fv_change_income": "公允价值变动收益",
@@ -119,7 +106,6 @@ CASHFLOW_ROLES = {
     "cash_begin": "期初（年初）现金及现金等价物余额",
     "cash_end": "期末（年末）现金及现金等价物余额",
     "capex": "购建固定资产、无形资产和其他长期资产支付的现金",
-    "dividend_paid": "分配股利、利润或偿付利息支付的现金",
     "cash_from_sales": "销售商品、提供劳务收到的现金",
 }
 
@@ -139,12 +125,22 @@ EQUITY_ROLES = {
     "capital_raised": "所有者投入和减少资本（该行的归母权益小计列；无小计列时取股东权益合计列）",
 }
 
+NOTES_ROLES = {
+    "ar_gross": "应收账款账面余额（账龄分析表的合计，计提坏账准备之前的数）",
+    "ar_provision": "应收账款坏账准备合计（按组合计提与按单项计提之和）",
+    "ar_aging_over_2y": "应收账款账龄两年以上的账面余额（原表按年限披露时填；只按信用期与逾期披露则留空）",
+    "inventory_gross": "存货账面余额（计提跌价准备之前的数）",
+    "inventory_provision": "存货跌价准备期末余额",
+    "restricted_cash": "使用受到限制的货币资金",
+}
+
 ROLES_BY_KIND: dict[str, dict[str, str]] = {
     "balance": BALANCE_ROLES,
     "income": INCOME_ROLES,
     "cashflow": CASHFLOW_ROLES,
     "supplement": SUPPLEMENT_ROLES,
     "equity": EQUITY_ROLES,
+    "notes": NOTES_ROLES,
 }
 
 DA_ROLES: tuple[str, ...] = ("da_fixed", "da_rou", "da_intangible", "da_lt_deferred", "da_inv_property")
@@ -209,6 +205,11 @@ IDENTITIES: tuple[Identity, ...] = (
         (("net_profit_supplement", 1.0),) + tuple((role, 1.0) for role in DA_ROLES) + (("supplement_other", 1.0), ("ocf_supplement", -1.0)),
         optional=DA_ROLES,
     ),
+    # 附注：能跟主表对上的就硬校验，对不上的只用不等式兜底
+    Identity("notes.ar_provision", "应收账款账面余额 − 坏账准备 = 资产负债表应收账款", (("ar_gross", 1.0), ("ar_provision", -1.0), ("accounts_receivable", -1.0))),
+    Identity("notes.ar_aging_over_2y", "账龄两年以上应收 ≤ 应收账款账面余额", (("ar_aging_over_2y", 1.0), ("ar_gross", -1.0)), sense="<="),
+    Identity("notes.inventory_pair", "存货账面余额 − 存货跌价准备 = 资产负债表存货", (("inventory_gross", 1.0), ("inventory_provision", -1.0), ("inventory", -1.0))),
+    Identity("notes.restricted_cash", "受限货币资金 ≤ 货币资金", (("restricted_cash", 1.0), ("monetary_funds", -1.0)), sense="<="),
     # 跨表
     Identity("cross.ocf", "补充资料经营净额 = 现金流量表经营净额", (("ocf_supplement", 1.0), ("ocf", -1.0))),
     Identity("cross.net_profit", "补充资料净利润 = 利润表净利润", (("net_profit_supplement", 1.0), ("net_profit", -1.0))),
@@ -288,7 +289,8 @@ def verify(roles: Mapping[str, float], *, abs_tol: float = 0.5, rel_tol: float =
             continue
         delta = sum(sign * float(roles.get(role) or 0.0) for role, sign in identity.terms)
         scale = max(abs(float(roles.get(role) or 0.0)) for role, _ in identity.terms) or 1.0
-        passed = abs(delta) <= max(abs_tol, rel_tol * scale)
+        tolerance = max(abs_tol, rel_tol * scale)
+        passed = delta <= tolerance if identity.sense == "<=" else abs(delta) <= tolerance
         checks.append(Check(identity.id, identity.desc, ("pass" if passed else ("diff" if identity.soft else "fail")), delta))
     return checks
 

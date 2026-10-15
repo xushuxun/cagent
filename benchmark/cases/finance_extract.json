@@ -68,7 +68,6 @@
     "cash_begin": 27233274462.3,
     "cash_end": 25280701698.0,
     "capex": 11509392097.33,
-    "dividend_paid": 4378732756.88,
     "net_profit_supplement": 9865280190.16,
     "ocf_supplement": 40355401297.93,
     "dividend": 3851337280.5,
@@ -129,7 +128,6 @@
     "cash_begin": "p.148 加:年初现金及现金等价物余额",
     "cash_end": "p.148 六、年末现金及现金等价物余额",
     "capex": "p.148 购建固定资产、无形资产和其他长期资产支付的现金",
-    "dividend_paid": "p.148 分配股利、利润或偿付利息支付的现金",
     "net_profit_supplement": "p.246 净利润",
     "ocf_supplement": "p.246 经营活动产生的现金流量净额",
     "supplement_adjustment": "p.246 十八条调节项合计",
@@ -205,8 +203,7 @@
     "cash_net_increase": -1952572764.3,
     "cash_begin": 27233274462.3,
     "cash_end": 25280701698.0,
-    "capex": 11509392097.33,
-    "dividend_paid": 4378732756.88
+    "capex": 11509392097.33
    },
    "provenance_by_role": {
     "total_current_assets": "与 A 股年报同源（H 股为繁体、独立排版），数值应完全一致",
@@ -256,8 +253,7 @@
     "cash_net_increase": "与 A 股年报同源（H 股为繁体、独立排版），数值应完全一致",
     "cash_begin": "与 A 股年报同源（H 股为繁体、独立排版），数值应完全一致",
     "cash_end": "与 A 股年报同源（H 股为繁体、独立排版），数值应完全一致",
-    "capex": "与 A 股年报同源（H 股为繁体、独立排版），数值应完全一致",
-    "dividend_paid": "与 A 股年报同源（H 股为繁体、独立排版），数值应完全一致"
+    "capex": "与 A 股年报同源（H 股为繁体、独立排版），数值应完全一致"
    }
   },
   {

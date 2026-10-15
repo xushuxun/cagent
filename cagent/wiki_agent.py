@@ -17,7 +17,6 @@ from cagent.agent import Agent
 from cagent.wiki_business import gen_business
 from cagent.wiki_decisions import gen_decisions
 from cagent.wiki_finance import gen_finance
-from cagent.wiki_products import gen_products  # noqa: F401  # 产品分析暂时下线（见 _MODULES），保留导入以便一行恢复
 from cagent.wiki_render import render_doc
 
 logger = logging.getLogger(__name__)
@@ -25,7 +24,6 @@ logger = logging.getLogger(__name__)
 # 模块顺序即页面栏目顺序；每个 gen 输出的 markdown 自带一级标题
 _MODULES = [
     ("business", gen_business),
-    # ("products", gen_products),
     ("decisions", gen_decisions),
     ("finance", gen_finance),
 ]

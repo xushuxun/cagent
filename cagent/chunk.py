@@ -22,6 +22,12 @@ from cagent.agent import Agent
 logger = logging.getLogger(__name__)
 
 _PAGE_RE = re.compile(r"<!-- page \d+ -->")
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _plain(text: str) -> str:
+    """去掉表格标签，留下可读文本，供片段清单展示。"""
+    return _TAG_RE.sub(" ", text).strip()
 
 
 def report_year(agent: Agent, md_path: str | Path) -> int:
@@ -391,18 +397,43 @@ class Toc:
             {listing}
             </chapters>
         """).strip()
+        schema = {
+            "type": "object",
+            "properties": {"indexes": {"type": "array", "items": {"type": "integer"}}},
+            "required": ["indexes"],
+        }
+        for attempt in range(2):
+            indexes = self.agent.chat_json(prompt, schema)["indexes"]
+            picked = [index for index in indexes if 0 <= index < len(chapters)]
+            if picked:
+                return picked
+            logger.warning(f"章节选择第 {attempt + 1} 次没有有效序号，重试")
+            prompt = f"{prompt}\n\n<retry>上一次返回的序号不在 0 到 {len(chapters) - 1} 之间，请重新给。</retry>"
+        raise ValueError("模型没有返回有效章节序号")
+
+    def pick_chunks(self, chunks: list[str], task: str, limit: int = 6) -> list[int]:
+        """从切好的片段里挑相关的几个：给模型看片段编号与首行，避免为一项事实通读整章。
+
+        片段切口落在 md 标题处，首行基本就是小节名或附注名，够模型判断相关性。
+        """
+        labels = []
+        for index, chunk in enumerate(chunks):
+            first = next((line.strip() for line in chunk.splitlines() if line.strip() and not line.startswith("<!--")), "")
+            labels.append(f'<chunk index="{index}">{_plain(first)[:60]}</chunk>')
+        prompt = textwrap.dedent(f"""
+            <requirements>
+            {task}
+            从清单里挑出真正相关的片段编号，最多 {limit} 个；都不相关就返回空数组。
+            </requirements>
+
+            <chunks>
+            {"".join(labels)}
+            </chunks>""").strip()
         indexes = self.agent.chat_json(
             prompt,
-            {
-                "type": "object",
-                "properties": {"indexes": {"type": "array", "items": {"type": "integer"}}},
-                "required": ["indexes"],
-            },
+            {"type": "object", "properties": {"indexes": {"type": "array", "items": {"type": "integer"}}}, "required": ["indexes"]},
         )["indexes"]
-        picked = [index for index in indexes if 0 <= index < len(chapters)]
-        if not picked:
-            raise ValueError("模型没有返回有效章节序号")
-        return picked
+        return [index for index in indexes if 0 <= index < len(chunks)][:limit]
 
     def gen_source(self, pick_chapters: list[int]) -> dict:
         return {
