@@ -75,7 +75,7 @@ from pathlib import Path
 
 from cagent.checks import IDENTITIES, Check, check_report, rollforward_check, verbatim_check, verify
 from cagent.chunk import Toc, report_year, split_pages
-from cagent.fields import ROLES, ROLES_BY_KIND, UNIT_SCALE, duplicate_roles, number, roles_from_rows
+from cagent.fields import ROLES, ROLES_BY_KIND, duplicate_roles, number, roles_from_rows, unit_currency, unit_scale
 from cagent.llm import LLM
 from cagent.scraper.lakehouse_index import atomic_write
 
@@ -751,7 +751,7 @@ def extract_financials(
             if not table:
                 continue
             unit = table.get("unit") or "元"
-            scale = UNIT_SCALE.get(unit.strip(), 1.0)
+            scale = unit_scale(unit)
             detail_rows = [row for row in detail_rows if row.get("kind") != need_id]
             for row in table["rows"]:
                 values = row.get("values") or [None, None]
@@ -789,6 +789,7 @@ def extract_financials(
             "picked": picked_tables,
         },
         "unit": next((segment.get("unit") for segment in segments if segment.get("unit")), "元"),
+        "currency": unit_currency(str(next((segment.get("unit") for segment in segments if segment.get("unit")), "元"))),
         "segments": segments,
         "checks": [check.__dict__ for check in all_checks],
         "unresolved": unresolved,

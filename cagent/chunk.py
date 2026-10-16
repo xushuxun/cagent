@@ -325,6 +325,38 @@ class Toc:
         self.chapters = json.loads(toc_file.read_text(encoding="utf-8"))  # [{"title", "page", "md_page"}]
         self.text = md_path.read_text(encoding="utf-8")
         self.n_pages = len(split_pages(self.text))
+        self._pick_script()   # 双语年报（港股常见：前一半英文、后一半繁体）只留中文半本
+
+    def _text_between(self, start: int, end: int) -> str:
+        begin = self.text.find(f"<!-- page {start} -->")
+        finish = self.text.find(f"<!-- page {end + 1} -->")
+        return self.text[begin : finish if finish != -1 else len(self.text)] if begin != -1 else ""
+
+    def _cjk_ratio(self, ch: dict) -> float:
+        """章节正文的汉字占比：英文半本 ≈ 0，繁体中文半本接近 1（表里夹英文行名也不影响）。"""
+        sample = self._text_between(ch["md_page"], ch["md_page"] + 2)[:6000]
+        cjk = len(re.findall(r"[\u4e00-\u9fff]", sample))
+        latin = len(re.findall(r"[A-Za-z]", sample))
+        return cjk / (cjk + latin) if cjk + latin else 0.0
+
+    def _pick_script(self) -> None:
+        """认一下语料形态，只用于诊断与日志，**不做裁剪**。
+
+        港股年报常见两种双语形态，处理方式完全不同：
+            分半本      前一半英文、后一半中文——目录（toc.json）本来只覆盖中文半本，管线读的就是中文；
+            页内对照    财务报表页里中文行名与英文行名并排——数字同一份，按中文行名标注即可，不必拆。
+        唯一的坑是"页内对照"页的汉字占比很低（实测 0.14–0.19），若按占比裁章节会把报表整章误删，
+        所以这里只判形态、只记日志，绝不据此增删章节。
+        """
+        ratios = [self._cjk_ratio(ch) for ch in self.chapters]
+        chinese = [ratio > 0.25 for ratio in ratios]
+        if all(chinese):
+            self.script = "zh"
+        elif not any(chinese):
+            self.script = "en"
+        else:
+            self.script = "mixed"
+        logger.debug(f"语料形态 {self.script}：汉字占比 {[round(r, 2) for r in ratios]}")
 
     def range(self, ch: dict) -> tuple[int, int]:
         """章节的 md 页码范围 (start, end)。"""

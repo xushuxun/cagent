@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 from cagent.checks import IDENTITIES
-from cagent.fields import DA_ROLES, ROLES, UNIT_SCALE, roles_from_rows
+from cagent.fields import DA_ROLES, ROLES, roles_from_rows, unit_currency, unit_scale
 
 _UNVERIFIED_ROLES = {identity.id: tuple(role for role, _ in identity.terms) for identity in IDENTITIES}
 
@@ -65,6 +65,8 @@ def load_series(root: Path, market: str, stock: str) -> dict[int, dict]:
             for row in (segments.get("supplement") or {}).get("rows") or []
             if any(value is not None for value in (row.get("values") or []))
         ]
+        # 币种从各段单位现算：老产物没存也能标对
+        currency = next((unit_currency(segment.get("unit") or "") for segment in segments.values() if unit_currency(segment.get("unit") or "") != "元"), fin.get("currency") or "元")
         # 固定字段从各段的行汇总：只认第一次出现的行（合计行在明细行前），成组 role 相加
         fields: dict[str, float] = {}
         fields_prior: dict[str, float] = {}
@@ -73,9 +75,9 @@ def load_series(root: Path, market: str, stock: str) -> dict[int, dict]:
             fields.update(roles_from_rows(segment.get("rows") or [], unit=unit))
             fields_prior.update(roles_from_rows(segment.get("rows") or [], unit=unit, column=1))
         if fields:
-            series[year] = {"roles": fields, "source": source, "basis": "本期", "complete": complete, "missing": missing, "pages": pages, "unit": fin.get("unit") or "元", "supplement": supplement, "dropped": dropped, "details": fin.get("details") or []}
+            series[year] = {"currency": currency, "roles": fields, "source": source, "basis": "本期", "complete": complete, "missing": missing, "pages": pages, "unit": fin.get("unit") or "元", "supplement": supplement, "dropped": dropped, "details": fin.get("details") or []}
         if fields_prior:
-            series[year - 1] = {"roles": fields_prior, "source": source, "basis": "上期（已重述口径）", "complete": complete, "missing": missing, "pages": pages, "unit": fin.get("unit") or "元", "supplement": supplement, "dropped": dropped, "details": fin.get("details") or []}
+            series[year - 1] = {"currency": currency, "roles": fields_prior, "source": source, "basis": "上期（已重述口径）", "complete": complete, "missing": missing, "pages": pages, "unit": fin.get("unit") or "元", "supplement": supplement, "dropped": dropped, "details": fin.get("details") or []}
     return series
 
 
@@ -392,7 +394,7 @@ def cash_reconciliation_table(series: dict[int, dict], years: list[int]) -> str:
     rows = series[year].get("supplement") or []
     if not rows:
         return ""
-    scale = UNIT_SCALE.get((series[year].get("unit") or "元").strip(), 1.0)
+    scale = unit_scale((series[year].get("unit") or "元").strip())
     body = []
     for label, values in rows:
         cells = [_fmt(values[i] * scale if i < len(values) and values[i] is not None else None, unit="亿", digits=2) for i in range(2)]
@@ -652,6 +654,9 @@ def evidence(series: dict[int, dict], years: list[int] | None = None) -> str:
         if pages:
             detail = "；".join(f"{_KIND_LABEL.get(kind, kind)} p.{'-'.join(str(p) for p in value)}" for kind, value in pages.items())
             parts.append(f"- {year} 表页：{detail}")
+    currencies = sorted({series[year].get("currency") or "元" for year in years})
+    if currencies != ["元"]:
+        parts.append(f"- 金额币种：{'、'.join(currencies)}（照原表列示，**未做汇率换算**；表中「亿元」一律读作「亿」+该币种）")
     dropped = sorted({role for year in years for role in (series[year].get("dropped") or set())})
     if dropped:
         parts.append(f"- 下列科目未通过附注对账，已按缺数处理：{'、'.join(ROLES.get(role, role) for role in dropped)}")

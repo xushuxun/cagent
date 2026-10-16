@@ -118,6 +118,34 @@ ROLES: dict[str, str] = {role: desc for kind_roles in ROLES_BY_KIND.values() for
 # 成组相加的 role（补充资料调节项这类一行不说明问题的科目）；其余 role 一行一义，重复标注取第一行（合计行在明细行前）。
 GROUP_ROLES: frozenset[str] = frozenset({"supplement_other"})
 
+def unit_scale(unit: str) -> float:
+    """原表单位 → 倍数。先把写法归一再判，别指望枚举得完。
+
+    年报里同一件事有无数写法：千美元 / US$'000 / US$' 000 / 千港元 / HK$'000 / 人民币千元 / 百万元。
+    按"币种 + 量级"归一到倍数，认不出量级就按 1（元）算。
+    """
+    text = (unit or "").strip().lower().replace(" ", "").replace("'", "").replace("’", "").replace("（", "(").replace("）", ")")
+    if text in UNIT_SCALE:
+        return UNIT_SCALE[text]
+    if any(token in text for token in ("百万", "million", "m)", "mn")):
+        return 1e6
+    if any(token in text for token in ("千", "000", "thousand", "k)")):
+        return 1e3
+    if "万" in text:
+        return 1e4
+    return 1.0
+
+
+def unit_currency(unit: str) -> str:
+    """原表单位 → 币种（元/港元/美元）。只认币种，不做汇率换算。"""
+    text = (unit or "").lower().replace(" ", "")
+    if any(token in text for token in ("港元", "港币", "hk$", "hkd")):
+        return "港元"
+    if any(token in text for token in ("美元", "us$", "usd")):
+        return "美元"
+    return "元"
+
+
 UNIT_SCALE: dict[str, float] = {
     "元": 1.0,
     "人民币元": 1.0,
@@ -128,6 +156,12 @@ UNIT_SCALE: dict[str, float] = {
     "百万元": 1e6,
     "人民币百万元": 1e6,
     "人民币千元": 1e3,
+    "千美元": 1e3,
+    "美元千元": 1e3,
+    "港币千元": 1e3,
+    "us$000": 1e3,
+    "usd000": 1e3,
+    "hkd000": 1e3,
 }
 
 _NULL_CELLS = frozenset({"", "-", "--", "—", "－", "/", "不适用", "无", "nil", "n/a"})
@@ -157,7 +191,7 @@ def roles_from_rows(rows: list[dict], unit: str = "元", column: int = 0) -> dic
     GROUP_ROLES 相加（调节项）；其余 role 只认第一次出现的行——「一、营业总收入」在「其中:营业收入」之前，
     取第一行才不会被合计行与明细行重复累加。重复标注用 duplicate_roles 查出来告警。
     """
-    scale = UNIT_SCALE.get(unit.strip(), 1.0)
+    scale = unit_scale(unit)
     roles: dict[str, float] = {}
     for row in rows:
         role = (row.get("role") or "").strip()
