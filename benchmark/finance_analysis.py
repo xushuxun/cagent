@@ -1,11 +1,12 @@
-"""finance 分析层基准：文档不变量检查
+"""报告层基准：文档不变量检查
 
 可自动化的部分（不需要 LLM 裁判）：
-    结构      两个小节齐全、拆解覆盖必备内容
-    数字越界  拆解节里出现的每个数字都必须能在证据表里找到——模型不得自造、换算、外推或累加数字
+    结构      四个部分齐全、14 问各有一节、每节都有正文
+    数字越界  生意模式与资本回报里出现的每个数字都必须能在「四、数据」里找到——
+              模型不得自造、换算、外推或累加数字
 
 用法：
-    uv run benchmark/finance_analysis.py            # 检查已有 finance.md
+    uv run benchmark/finance_analysis.py            # 检查已有 report.md
     uv run benchmark/finance_analysis.py --selftest # 离线自检解析与判定，不需要 LLM 与产物
 """
 
@@ -25,7 +26,9 @@ _PAGE_MARK = re.compile(r"<!-- page (\d+) -->")
 _PAGE_CITE = re.compile(r"p\.\s?(\d+)")
 _YEAR = re.compile(r"(?:19|20)\d{2}")
 _NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
-_SECTIONS = ("## 一、数据", "## 二、资本回报拆解")
+_SECTIONS = ("## 一、生意模式", "## 二、历年经营决策", "## 三、资本回报", "## 四、数据")
+_PROSE_SECTIONS = ("## 一、生意模式", "## 三、资本回报")
+_QUESTION_HEADINGS = 14
 
 
 def selftest() -> int:
@@ -55,11 +58,11 @@ def selftest() -> int:
 
 def evaluate(case: dict, output_root: Path, root: Path) -> int:
     stock, market = case["stock"], case["market"]
-    doc_path = output_root / market / stock / "finance.md"
+    doc_path = output_root / market / stock / "report.md"
     print(f"\n案例 {market}/{stock}")
     print(f"  文档 {doc_path}")
     if not doc_path.exists():
-        print("  ✗ 无 finance.md，先跑 cagent/wiki_finance.py")
+        print("  ✗ 无 report.md，先跑 cagent/report.py")
         return 1
 
     doc = doc_path.read_text(encoding="utf-8")
@@ -67,43 +70,57 @@ def evaluate(case: dict, output_root: Path, root: Path) -> int:
 
     for section in _SECTIONS:
         if section not in doc:
-            problems.append(f"缺小节 {section}")
-    level2 = re.findall(r"(?m)^## ", doc)
-    if len(level2) != 2:
-        problems.append(f"二级标题 {len(level2)} 个，期望 2")
+            problems.append(f"缺部分 {section}")
 
-    evidence_part, _, prose = doc.partition(_SECTIONS[1])
+    # 数据部分在最后：它之前的正文里出现的每个数字都必须能在数据里找到
+    data_index = doc.find(_SECTIONS[3])
+    narrative, answers = (doc[: doc.find(_SECTIONS[2])], doc[doc.find(_SECTIONS[2]): data_index]) if data_index >= 0 else (doc, "")
+    evidence_part = doc[data_index:] if data_index >= 0 else ""
     evidence_numbers = allowed_numbers(evidence_part)
-
-    # 全篇数字只许来自证据表：模型自造、换算、外推、累加都会在这里露馅
+    # 叙述节的数字还可以来自年报原文（读过的那几章），把原文并进允许集合
+    corpus = "\n".join(path.read_text(encoding="utf-8") for path in sorted((root / market / stock / "derived").glob("*.md")))
+    narrative_numbers = evidence_numbers | allowed_numbers(corpus)
     violations = []
-    for token, decimals in numbers_in(prose):
-        value = float(token.replace(",", ""))
-        if not on_evidence(value, decimals, evidence_numbers, tol=case.get("tol", 0.0)):
-            violations.append(token)
+    for section, allowed in ((narrative, narrative_numbers), (answers, evidence_numbers)):
+        for token, decimals in numbers_in(section):
+            value = float(token.replace(",", ""))
+            if not on_evidence(value, decimals, allowed, tol=case.get("tol", 0.0)):
+                violations.append(token)
     limit = case.get("max_out_of_scope", 0)
-    print(f"  证据表数字 {len(evidence_numbers)} 个；正文越界 {len(violations)} 个（允许 {limit}）")
+    print(f"  数据部分数字 {len(evidence_numbers)} 个；正文越界 {len(violations)} 个（允许 {limit}；叙述节另许年报原文）")
     for token in violations[:10]:
         print(f"    ✗ {token}")
     if len(violations) > limit:
         problems.append(f"越界数字 {len(violations)} 个")
 
-    # 只在拆解正文里查必备内容：整篇匹配会被数据表的表头蒙混过去
-    missing_terms = [term for term in case.get("required_terms", []) if term not in prose]
+    # 14 问各一节，且每节都有正文（标题由程序写死，少一节说明装配坏了）
+    headings = re.findall(r"(?m)^### (\d+)\. ", doc)
+    expected = case.get("questions", _QUESTION_HEADINGS)
+    print(f"  问题小节 {len(headings)} 个，期望 {expected}")
+    if expected and len(headings) != expected:
+        problems.append(f"问题小节 {len(headings)} 个，期望 {expected}")
+    empty = [number for number in headings if not _section_body(doc, number).strip()]
+    if empty:
+        problems.append(f"这些问题小节没有正文：{'、'.join(empty)}")
+
+    missing_terms = [term for term in case.get("required_terms", []) if term not in doc]
     print(f"  必备内容 {len(case.get('required_terms', [])) - len(missing_terms)}/{len(case.get('required_terms', []))} 出现")
     if missing_terms:
-        problems.append(f"拆解缺内容：{'、'.join(missing_terms)}")
-
-    # 维度标题由程序写死，少一条说明装配坏了，与模型笔下松紧无关
-    headings = re.findall(r"(?m)^### (\d+)\. ", prose)
-    expected = case.get("dimensions", 0)
-    print(f"  维度标题 {len(headings)} 个，期望 {expected}")
-    if expected and len(headings) != expected:
-        problems.append(f"维度标题 {len(headings)} 个，期望 {expected}")
+        problems.append(f"报告缺内容：{'、'.join(missing_terms)}")
 
     for line in problems:
         print(f"  ✗ {line}")
     return 1 if problems else 0
+
+
+def _section_body(doc: str, number: str) -> str:
+    """取某个问题小节的正文（到下一个同级标题为止）。"""
+    match = re.search(rf"(?m)^### {re.escape(number)}\. .*?$", doc)
+    if not match:
+        return ""
+    rest = doc[match.end():]
+    nxt = re.search(r"(?m)^###? ", rest)
+    return rest[: nxt.start()] if nxt else rest
 
 
 def main() -> None:

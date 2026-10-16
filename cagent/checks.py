@@ -210,8 +210,16 @@ def allowed_numbers(evidence_text: str) -> set[float]:
 
 
 def on_evidence(value: float, decimals: int, allowed: set[float], *, tol: float = 0.5) -> bool:
-    """按正文写出的小数位，判断这个数是否落在证据表某个数上。"""
-    return any(abs(candidate - value) <= max(tol, 0.5 * 10 ** (-decimals) + 1e-9) for candidate in allowed)
+    """按正文写出的小数位，判断这个数是否落在证据里。
+
+    允许万/亿/千的单位换算：原文写「4,033,700,000,000 元」，正文写成「4,033.7 亿」是同一笔数，
+    与逐字校验用的是同一套写法（`_number_forms`）。
+    """
+    for factor in (1.0, 1e4, 1e8, 1e-4, 1e-8):
+        scaled = value * factor
+        if any(abs(candidate - scaled) <= max(tol, 0.5 * 10 ** (-decimals) + 1e-9) for candidate in allowed):
+            return True
+    return False
 
 
 def outside_numbers(text: str, evidence_text: str, *, tol: float = 0.5) -> list[str]:
