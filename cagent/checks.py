@@ -24,7 +24,11 @@ from cagent.fields import DA_ROLES
 
 @dataclass(frozen=True)
 class Identity:
-    """一条恒等式：terms 各项加权求和应等于 0；soft 只报告差异，不触发重取。"""
+    """一条恒等式：terms 各项加权求和应等于 0；soft 只报告差异，不触发重取。
+
+    只写"放之各家皆准"的勾稽（资产＝负债＋权益、利润逐级、小计−流出＝净额、跨表锚点）；
+    列报方式各家不同（汇率影响放在净增加额之内还是之外），那部分由模型在抽取时声明（见 closing_check）。
+    """
 
     id: str
     desc: str
@@ -75,12 +79,8 @@ IDENTITIES: tuple[Identity, ...] = (
     Identity("cashflow.ocf", "经营活动现金流量净额 = 流入小计 − 流出小计", (("ocf", 1.0), ("ocf_inflow", -1.0), ("ocf_outflow", 1.0))),
     Identity("cashflow.icf", "投资活动现金流量净额 = 流入小计 − 流出小计", (("icf", 1.0), ("icf_inflow", -1.0), ("icf_outflow", 1.0))),
     Identity("cashflow.fcf", "筹资活动现金流量净额 = 流入小计 − 流出小计", (("fcf", 1.0), ("fcf_inflow", -1.0), ("fcf_outflow", 1.0))),
-    Identity(
-        "cashflow.net_increase",
-        "现金净增加额 = 经营净额 + 投资净额 + 筹资净额 + 汇率影响",
-        (("cash_net_increase", 1.0), ("ocf", -1.0), ("icf", -1.0), ("fcf", -1.0), ("fx_effect", -1.0)),
-    ),
-    Identity("cashflow.balance", "期末现金及现金等价物 = 期初 + 净增加额", (("cash_end", 1.0), ("cash_begin", -1.0), ("cash_net_increase", -1.0))),
+    # 现金净增加额与期末余额怎么闭合，各家列报不同（汇率影响在内还是在外），由模型声明后程序验算术，
+    # 故这里不再写死公式：只留"流入小计 − 流出小计 = 净额"这类放之各家皆准的关系。
     # 补充资料：一次性给折旧摊销那组行上保险
     Identity(
         "supplement.reconcile",
@@ -121,6 +121,27 @@ def verify(roles: Mapping[str, float], *, abs_tol: float = 0.5, rel_tol: float =
         passed = delta <= tolerance if identity.sense == "<=" else abs(delta) <= tolerance
         checks.append(Check(identity.id, identity.desc, ("pass" if passed else ("diff" if identity.soft else "fail")), delta))
     return checks
+
+
+def closing_check(kind: str, closing: dict | None, roles: Mapping[str, float], *, abs_tol: float = 0.5, rel_tol: float = 1e-12) -> Check:
+    """声明的闭合关系是否算得通。
+
+    列报差异（汇率影响放在净增加额之内还是之外、期末余额怎么来）不写进程序，由模型在读表时声明：
+    `{"total": "<role>", "addends": ["<role>", "-<role>", …]}`（减项前缀 `-`，顺序照原表）。
+    程序只做一件事：加项加权和是否等于合计——纯算术，不含任何报表格式知识。
+    """
+    desc = "声明的合计关系算得通（合计 = 各加项之和，减项以 - 前缀）"
+    if not closing or not closing.get("total"):
+        return Check(f"closing.{kind}", desc, "skip", None, ("closing",))
+    addends = [str(item) for item in (closing.get("addends") or [])]
+    terms = [(str(closing["total"]), -1.0)] + [(item.lstrip("-"), -1.0 if item.startswith("-") else 1.0) for item in addends]
+    missing = tuple(role for role, _ in terms if roles.get(role) is None)
+    if missing:
+        return Check(f"closing.{kind}", desc, "skip", None, missing)
+    delta = sum(sign * float(roles.get(role) or 0.0) for role, sign in terms)   # 各加项之和 − 合计
+    scale = max(abs(float(roles.get(role) or 0.0)) for role, _ in terms) or 1.0
+    passed = abs(delta) <= max(abs_tol, rel_tol * scale)
+    return Check(f"closing.{kind}", desc + f"（{' + '.join(['合计'] + addends)}）", "pass" if passed else "fail", delta)
 
 
 def rollforward_check(roles: Mapping[str, float], roles_prior: Mapping[str, float], *, abs_tol: float = 0.5) -> Check:

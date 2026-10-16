@@ -73,9 +73,9 @@ import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
-from cagent.checks import IDENTITIES, Check, check_report, rollforward_check, verbatim_check, verify
+from cagent.checks import IDENTITIES, Check, check_report, closing_check, rollforward_check, verbatim_check, verify
 from cagent.chunk import Toc, report_year, split_pages
-from cagent.fields import ROLES, ROLES_BY_KIND, duplicate_roles, number, roles_from_rows, unit_currency, unit_scale
+from cagent.fields import REQUIRED_ROLES, ROLES, ROLES_BY_KIND, duplicate_roles, number, roles_from_rows, unit_currency, unit_scale
 from cagent.llm import LLM
 from cagent.scraper.lakehouse_index import atomic_write
 
@@ -188,8 +188,16 @@ def _extract_schema() -> dict:
             "pages": {"type": "array", "items": {"type": "integer"}},
             "columns": {"type": "array", "items": {"type": "string"}},
             "rows": {"type": "array", "items": {"type": "array", "items": {"type": ["string", "number", "null"]}}},
+            "closing": {
+                "type": "object",
+                "properties": {
+                    "total": {"type": "string"},
+                    "addends": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["total", "addends"],
+            },
         },
-        "required": ["consolidated", "title", "unit", "pages", "columns", "rows"],
+        "required": ["consolidated", "title", "unit", "pages", "columns", "rows", "closing"],
     }
 
 
@@ -253,6 +261,11 @@ def _statement_prefix(kind: str, tables_html: str) -> str:
         - 原表单元格是「-」「—」或空白时：该科目确实为零（可由合计行勾稽印证，如少数股东损益）填 0；
           原表没有这一行、或该数不适用则填 null
         - unit 填原表单位（元/千元/百万元），照抄原表
+        - closing 说明这张表**最末一笔合计**是怎么算出来的，只填词表里的 role（不是原表的行名）：
+          total 填合计行的 role，addends 按原表列示顺序填各加项的 role，减项在 role 前加 `-`。
+          例：资产负债表末行「資產總額」= 流動資產 + 非流動資產 → total=total_assets，addends=["total_current_assets","total_noncurrent_assets"]；
+          现金流量表末行「期末現金及現金等價物」= 期初 + 增加淨額 + 匯率影響 → total=cash_end，addends=["cash_begin","cash_net_increase","fx_effect"]。
+          照原表怎么写的就怎么填：原表把汇率影响列进净增加额就把它算在净增加额里，别按别的公司或别的准则的写法套
         </requirement>
 
         <roles>
@@ -322,6 +335,11 @@ def segment_feedback(kind: str, table: dict | None, known_roles: dict[str, float
     scope_ok = table.get("consolidated") is True
     score = len(failures) * 2 + (0 if scope_ok else 1) + min(len(missing), 2)
     lines = []
+    # 骨架行漏抄：原表一定有、下游整列靠它，漏了就要重抄（恒等式对这种情况只会跳过，不会报错）
+    absent = [role for role in REQUIRED_ROLES.get(kind, ()) if role not in roles]
+    if absent:
+        score += min(len(absent), 4)
+        lines.append("- 这些是报表骨架行，原表一定有，请补上：" + "、".join(ROLES.get(role, role) for role in absent[:6]))
     for check in failures:
         identity = _IDENTITY_BY_ID[check.id]
         terms = "；".join(f"{role}={roles.get(role, 0.0):,.2f}" for role, _ in identity.terms)
@@ -340,6 +358,34 @@ def _consolidated_check(kind: str, table: dict) -> Check:
     """口径守卫：母公司报表自身也满足全部恒等式，抄错了恒等式抓不住，只能靠口径自报挡一道。"""
     ok = table.get("consolidated") is True
     return Check(f"scope.{kind}", "抄的是合并报表口径（母公司报表同样平，靠这一条挡）", "pass" if ok else "fail")
+
+
+def verify_segments(segments: list[dict], report_text: str) -> tuple[list[Check], dict[str, float], dict[str, float]]:
+    """各段的行 → 固定字段 → 全部校验结论（恒等式、口径、逐字、跨表、权益滚动）。
+
+    抽取与"重算校验"共用这一条逻辑：恒等式口径变了，不重抽也能把结论刷新一遍。
+    """
+    checks: list[Check] = []
+    roles: dict[str, float] = {}
+    roles_prior: dict[str, float] = {}
+    for segment in segments:
+        kind = segment.get("kind") or ""
+        rows = segment.get("rows") or []
+        unit = segment.get("unit") or "元"
+        roles.update(roles_from_rows(rows, unit=unit))
+        roles_prior.update(roles_from_rows(rows, unit=unit, column=1))
+        if kind == NOTES:
+            continue
+        checks.extend(check for check in verify(roles) if check.id.startswith(kind))
+        checks.append(closing_check(kind, segment.get("closing"), roles))
+        checks.append(_consolidated_check(kind, segment))
+    if any(segment.get("kind") == NOTES for segment in segments):
+        checks.extend(check for check in verify(roles) if check.id.startswith("notes"))
+    for segment in segments:
+        checks.append(verbatim_check(segment.get("kind") or "", segment, report_text))
+    checks.extend(check for check in verify(roles) if check.id.startswith("cross"))
+    checks.append(rollforward_check(roles, roles_prior))
+    return checks, roles, roles_prior
 
 
 def _tables_html(inventory: list[dict], ids: list[str]) -> str:
@@ -670,6 +716,12 @@ def extract_details(agent: LLM, toc: Toc, need: DetailNeed, *, attempts: int = 2
     return table
 
 
+def recheck(artifact: dict, report_text: str) -> dict:
+    """只用已有产物重算校验结论（0 次模型调用）：恒等式口径变了、或想复核时用。"""
+    checks, _, _ = verify_segments(artifact.get("segments") or [], report_text)
+    return {**artifact, "checks": [check.__dict__ for check in checks], "unresolved": [check.id for check in checks if check.status == "fail"]}
+
+
 def extract_financials(
     agent: LLM,
     md_path: str | Path,
@@ -767,16 +819,8 @@ def extract_financials(
                 )
             logger.info(f"明细 {need_id}：{len(table['rows'])} 行")
 
-    roles: dict[str, float] = {}
-    roles_prior: dict[str, float] = {}
-    for table in segments:
-        rows = table.get("rows") or []
-        unit = table.get("unit") or "元"
-        roles.update(roles_from_rows(rows, unit=unit))
-        roles_prior.update(roles_from_rows(rows, unit=unit, column=1))
-    cross_checks = [check for check in verify(roles) if check.id.startswith("cross")]
-    cross_checks.append(rollforward_check(roles, roles_prior))
-    all_checks.extend(cross_checks)
+    all_checks, _roles, _roles_prior = verify_segments(segments, report_text)
+    cross_checks = [check for check in all_checks if check.id.startswith(("cross", "equity"))]
 
     unresolved = [check.id for check in all_checks if check.status == "fail"]
     financials = {
@@ -807,6 +851,7 @@ def main() -> None:
     parser.add_argument("--root", default=str(Path(__file__).resolve().parents[1] / ".cagent"))
     parser.add_argument("--force", action="store_true", help="重取已存在的 financials.json")
     parser.add_argument("--details", default="", help="按需明细，逗号分隔（transfer/obligation/related）；空则不抽")
+    parser.add_argument("--recheck", action="store_true", help="只用已有产物重算校验结论（不调用模型）")
     parser.add_argument("--kind", action="append", choices=_ALL_KINDS, help="只重取某几张表（可重复），其余沿用已有产物")
     args = parser.parse_args()
 
@@ -820,6 +865,14 @@ def main() -> None:
     failed: list[str] = []
     for md_path in mds:
         out_path = Path(args.root) / args.market / args.stock / "knowledge" / md_path.stem / "financials.json"
+        if args.recheck:
+            if not out_path.exists():
+                logger.warning(f"{out_path} 不存在，无法重算")
+                continue
+            refreshed = recheck(json.loads(out_path.read_text(encoding="utf-8")), md_path.read_text(encoding="utf-8"))
+            atomic_write(out_path, (json.dumps(refreshed, ensure_ascii=False, indent=1) + "\n").encode("utf-8"))
+            logger.info(f"重算: {out_path.name}（未通过 {len(refreshed['unresolved'])} 条：{refreshed['unresolved']}）")
+            continue
         if out_path.exists() and not args.force and not args.kind:
             logger.info(f"跳过（已存在）: {out_path}")
             continue

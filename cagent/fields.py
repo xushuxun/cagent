@@ -113,6 +113,16 @@ ROLES_BY_KIND: dict[str, dict[str, str]] = {
 
 DA_ROLES: tuple[str, ...] = ("da_fixed", "da_rou", "da_intangible", "da_lt_deferred", "da_inv_property")
 
+# 每种报表的骨架行：漏抄这些行会让下游整列空白，而恒等式只会"跳过"、不会报错，所以单独点名。
+# 附注不设骨架行：披露与否本来因公司而异。
+REQUIRED_ROLES: dict[str, tuple[str, ...]] = {
+    "balance": ("total_assets", "total_liabilities", "total_equity", "equity_parent", "monetary_funds"),
+    "income": ("revenue", "operating_profit", "total_profit", "net_profit", "net_profit_parent"),
+    "cashflow": ("ocf", "icf", "fcf", "cash_net_increase", "cash_begin", "cash_end", "capex", "cash_from_sales"),
+    "supplement": ("net_profit_supplement", "ocf_supplement"),
+    "equity": ("dividend", "capital_raised"),
+}
+
 ROLES: dict[str, str] = {role: desc for kind_roles in ROLES_BY_KIND.values() for role, desc in kind_roles.items()}
 
 # 成组相加的 role（补充资料调节项这类一行不说明问题的科目）；其余 role 一行一义，重复标注取第一行（合计行在明细行前）。
