@@ -1,14 +1,15 @@
 """report：报告装配
 
-把三类东西装成一份公司档案，顺序就是阅读顺序：
+把三类东西装成一份公司档案，顺序就是阅读顺序（标题不带编号，顺序由侧边目录表达）：
 
-    一、生意模式        读年报原文，关键投入引财务证据（sections）
-    二、历年经营决策    逐年读年报原文（sections）
-    三、资本回报       14 个问题，每问一次生成、数字全部来自证据表（questions）
-    四、数据           程序直解与算术的证据表 + 口径与来源（finance_series）
+    生意模式        读年报原文，关键投入引财务证据（sections）
+    历年经营决策    逐年读年报原文（sections）
+    资本回报       14 个问题，每问一次生成、数字全部来自证据表（questions）
+    数据           程序直解与算术的证据表 + 口径与来源（finance_series）
 
 每类都先落成独立小节文件（可单独重跑），再合成 `report.md` 与 `index.html`。
-装配只做拼装与校验：不碰数字、不改正文。
+装配只做拼装与两件收尾：**把出处收进 sources.md**（正文留给读者，出处留给核对）、把标题层级理平。
+`--with-sources` 可把出处放回正文。
 
 用法：
     uv run cagent/report.py --stock 601633 --market cn
@@ -20,6 +21,7 @@ import logging
 import sys
 from pathlib import Path
 
+from cagent.citations import render_sources, split_citations, strip
 from cagent.llm import LLM
 from cagent.narratives.business import BUSINESS
 from cagent.narratives.decisions import DECISIONS
@@ -30,7 +32,10 @@ from cagent.series import evidence, load_series
 
 logger = logging.getLogger(__name__)
 
-_STRUCTURE = ("# ", "## 一、生意模式", "## 二、历年经营决策", "## 三、资本回报", "## 四、数据")
+SECTION_BUSINESS = "生意模式"
+SECTION_DECISIONS = "历年经营决策"
+SECTION_RETURN = "资本回报"
+SECTION_DATA = "数据"
 
 
 def _demote(text: str, target: int = 3) -> str:
@@ -59,6 +64,11 @@ def _wrap(title: str, text: str, *, drop_first_heading: bool = True, target: int
     return f"## {title}\n\n{body}".strip()
 
 
+def _collect(text: str) -> list[str]:
+    """收集一小节里的出处（不改变原文）。"""
+    return split_citations(text)[1]
+
+
 def _section_path(output_dir: Path, name: str) -> Path:
     return output_dir / f"{name}.md"
 
@@ -75,24 +85,28 @@ def _reuse_or_write(output_dir: Path, name: str, force: bool, build) -> str:
     return text
 
 
-def build_report(agent: LLM, stock: str, market: str, root: Path, output_dir: Path, force: bool = False) -> Path:
+def build_report(agent: LLM, stock: str, market: str, root: Path, output_dir: Path, force: bool = False, with_sources: bool = False) -> Path:
     """合成一份档案，返回 report.md 路径。"""
     series = load_series(root, market, stock)
     years = sorted(series)
     evidence_text = evidence(series, years)
 
     parts: list[str] = []
+    sources: list[tuple[str, list[str]]] = []
 
-    # 一、生意模式：读原文 + 引证据（引的数字受校验）
+    # 生意模式：读原文 + 引证据（引的数字受校验）
     business = _reuse_or_write(output_dir, "business", force, lambda: write_section(agent, BUSINESS, stock, market, root, evidence_text))
-    parts.append(_wrap("一、生意模式", business))
-    # 二、历年经营决策：逐年读原文
-    decisions = _reuse_or_write(output_dir, "decisions", force, lambda: write_section(agent, DECISIONS, stock, market, root))
-    parts.append(_wrap("二、历年经营决策", decisions))
+    parts.append(_wrap(SECTION_BUSINESS, business))
+    sources.append((SECTION_BUSINESS, _collect(business)))
 
-    # 三、资本回报：14 问（标题编号即阅读顺序，判据紧跟在标题下）
-    answers = ["## 三、资本回报"]
-    for number, question in enumerate(QUESTIONS, start=1):
+    # 历年经营决策：逐年读原文
+    decisions = _reuse_or_write(output_dir, "decisions", force, lambda: write_section(agent, DECISIONS, stock, market, root))
+    parts.append(_wrap(SECTION_DECISIONS, decisions))
+    sources.append((SECTION_DECISIONS, _collect(decisions)))
+
+    # 资本回报：14 问，标题不带编号（顺序由侧边目录表达）
+    answers = [f"## {SECTION_RETURN}"]
+    for question in QUESTIONS:
         body = _reuse_or_write(
             output_dir,
             question.id,
@@ -102,13 +116,18 @@ def build_report(agent: LLM, stock: str, market: str, root: Path, output_dir: Pa
         lines = body.strip().splitlines()
         if lines and lines[0].startswith("#"):
             lines = lines[1:]
-        answers.append(f"### {number}. {question.title}\n\n" + "\n".join(lines).strip())
+        answers.append(f"### {question.title}\n\n" + "\n".join(lines).strip())
+        sources.append((f"{SECTION_RETURN} · {question.title}", _collect(body)))
     parts.append("\n\n".join(answers))
 
-    # 四、数据：证据表与来源
-    parts.append("## 四、数据\n\n" + evidence_text.split("\n", 1)[1].strip())
+    # 数据：证据表与来源
+    # 数据节的表比节标题低一级：侧边目录里它们要挂在「数据」下面，而不是与各节平级
+    parts.append(f"## {SECTION_DATA}\n\n" + _demote(evidence_text.split("\n", 1)[1].strip(), target=3))
 
     doc = f"# {stock} · 公司档案（{market}）\n\n" + "\n\n".join(parts) + "\n"
+    if not with_sources:
+        doc = strip(doc)
+    (output_dir / "sources.md").write_text(render_sources(sources), encoding="utf-8")
     md_path = output_dir / "report.md"
     md_path.write_text(doc, encoding="utf-8")
     html_path = output_dir / "index.html"
@@ -125,12 +144,13 @@ def main() -> None:
     parser.add_argument("--root", type=Path, default=Path(".cagent"))
     parser.add_argument("--out", type=Path, default=Path("output/wiki"))
     parser.add_argument("--force", action="store_true", help="重跑全部小节")
+    parser.add_argument("--with-sources", action="store_true", help="把出处放回正文（逐条核对时用）")
     args = parser.parse_args()
 
     agent = LLM(trace=True)
     output_dir = args.out / args.market / args.stock
     output_dir.mkdir(parents=True, exist_ok=True)
-    build_report(agent, args.stock, args.market, args.root, output_dir, force=args.force)
+    build_report(agent, args.stock, args.market, args.root, output_dir, force=args.force, with_sources=args.with_sources)
     print(agent.ledger.summary())
 
 

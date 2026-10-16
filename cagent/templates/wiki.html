@@ -5,54 +5,100 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title }}</title>
 <style>
-  :root { --ink:#1f2328; --mute:#656d76; --line:#e5e7eb; --bg:#fff; --panel:#f6f8fa; --accent:#0969da; }
+  :root { --ink:#1f2328; --mute:#656d76; --line:#e8eaed; --bg:#fff; --panel:#f7f8fa; --accent:#0969da; }
   * { margin:0; box-sizing:border-box; }
-  body { background:var(--bg); color:var(--ink); font:14px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif; }
+  html { scroll-behavior:smooth; }
+  body { background:var(--bg); color:var(--ink); font:14.5px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif; }
 
-  .topbar { position:sticky; top:0; z-index:10; background:var(--bg); border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:12px; padding:10px 24px; }
-  .topbar b { font-size:14px; }
+  .topbar { position:sticky; top:0; z-index:20; background:rgba(255,255,255,.92); backdrop-filter:blur(6px); border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:12px; padding:10px 26px; }
+  .topbar b { font-size:14px; letter-spacing:.2px; }
   .topbar span { color:var(--mute); font-size:12px; }
   .copy-btn { margin-left:auto; font:12.5px inherit; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:5px 14px; cursor:pointer; }
   .copy-btn:hover { border-color:var(--accent); color:var(--accent); }
 
-  main { max-width:920px; margin:0 auto; padding:16px 32px 60px; }
+  .layout { display:flex; align-items:flex-start; gap:40px; max-width:1180px; margin:0 auto; padding:0 26px 80px; }
 
-  h1 { font-size:15px; font-weight:600; margin:26px 0 8px; padding-bottom:5px; border-bottom:1px solid var(--line); scroll-margin-top:56px; }
-  h4 { font-size:13.5px; font-weight:600; margin:18px 0 6px; scroll-margin-top:56px; }
+  nav.toc { position:sticky; top:64px; flex:0 0 236px; max-height:calc(100vh - 96px); overflow-y:auto; padding:22px 0 40px; font-size:12.5px; }
+  nav.toc a { display:block; color:var(--mute); text-decoration:none; padding:4px 10px; border-left:2px solid transparent; border-radius:0 4px 4px 0; line-height:1.5; }
+  nav.toc a:hover { color:var(--ink); background:var(--panel); }
+  nav.toc a.lv2 { color:var(--ink); font-weight:600; margin-top:12px; }
+  nav.toc a.lv2:first-child { margin-top:0; }
+  nav.toc a.lv3 { padding-left:22px; font-size:12px; }
+  nav.toc a.active { color:var(--accent); border-left-color:var(--accent); background:#f0f6ff; }
 
-  .mod p { margin:8px 0; font-size:14px; text-align:justify; }
-  .mod ul, .mod ol { margin:6px 0 10px; padding-left:24px; }
-  .mod table { width:100%; border-collapse:collapse; font-size:13px; margin:6px 0 10px; }
+  main { flex:1 1 auto; min-width:0; padding:22px 0 0; }
+
+  h1 { font-size:19px; font-weight:600; margin:30px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--line); scroll-margin-top:70px; }
+  h2 { font-size:16px; font-weight:600; margin:34px 0 10px; scroll-margin-top:70px; }
+  h3 { font-size:14.5px; font-weight:600; margin:22px 0 6px; scroll-margin-top:70px; }
+  h4 { font-size:13.5px; font-weight:600; margin:18px 0 6px; scroll-margin-top:70px; color:#30363d; }
+
+  .mod p { margin:9px 0; text-align:justify; }
+  .mod ul, .mod ol { margin:6px 0 12px; padding-left:22px; }
+  .mod li { margin:3px 0; }
+  .mod blockquote { margin:6px 0 12px; padding:6px 14px; color:var(--mute); border-left:2px solid var(--line); font-size:13.5px; }
+  .mod table { width:100%; border-collapse:collapse; font-size:13px; margin:10px 0 14px; }
   .mod th { text-align:left; font-weight:500; font-size:12px; color:var(--mute); border-bottom:1px solid var(--ink); padding:5px 8px 5px 0; }
   .mod td { border-bottom:1px solid var(--line); padding:5px 8px 5px 0; vertical-align:top; }
+  .mod section + section { margin-top:26px; }
+
+  @media (max-width: 900px) {
+    .layout { flex-direction:column; gap:0; }
+    nav.toc { position:static; flex:none; width:100%; max-height:none; border-bottom:1px solid var(--line); padding:14px 0; }
+    nav.toc a.lv3 { display:none; }
+  }
 </style>
 </head>
 <body>
 
-<div class="topbar"><b>{{ title }}</b><span>{{ ticker }}</span><button class="copy-btn" onclick="copyReport(this)">复制全文与估值 Prompt</button></div>
+<div class="topbar"><b>{{ title }}</b><span>{{ ticker }}</span><button class="copy-btn" onclick="copyReport(this)">复制全文</button></div>
 
-<main>
+<div class="layout">
+  <nav class="toc">
+    {% for item in toc %}<a class="lv{{ item.level }}" href="#{{ item.anchor }}">{{ item.text }}</a>
+    {% endfor %}
+  </nav>
+  <main>
 {{ body }}
-</main>
+  </main>
+</div>
 
 <script>
 var COPY_TEXT = {{ copy_json }};
+
 function copyReport(btn) {
-  function done() {
-    var old = btn.textContent;
-    btn.textContent = '已复制';
-    setTimeout(function () { btn.textContent = old; }, 1500);
-  }
+  function done() { var old = btn.textContent; btn.textContent = '已复制'; setTimeout(function () { btn.textContent = old; }, 1500); }
   function fallback() {
     var ta = document.createElement('textarea');
     ta.value = COPY_TEXT; document.body.appendChild(ta); ta.select();
     try { document.execCommand('copy'); done(); } catch (e) {}
     document.body.removeChild(ta);
   }
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(COPY_TEXT).then(done, fallback);
-  } else { fallback(); }
+  if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(COPY_TEXT).then(done, fallback); } else { fallback(); }
 }
+
+// 目录高亮：滚到哪一节，目录里那一节就亮起来（读长报告时不迷路）
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+  var targets = links.map(function (a) { return document.getElementById(a.getAttribute('href').slice(1)); }).filter(Boolean);
+  if (!targets.length || !('IntersectionObserver' in window)) return;
+  var visible = new Set();
+  function refresh() {
+    var current = null;
+    targets.forEach(function (el) { if (visible.has(el.id)) current = current || el.id; });
+    if (!current) return;
+    links.forEach(function (a) { a.classList.remove('active'); });
+    var link = byId[current];
+    if (link) { link.classList.add('active'); }
+  }
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) { if (entry.isIntersecting) { visible.add(entry.target.id); } else { visible.delete(entry.target.id); } });
+    refresh();
+  }, { rootMargin: '-70px 0px -70% 0px', threshold: 0 });
+  targets.forEach(function (el) { observer.observe(el); });
+})();
 </script>
 
 </body>

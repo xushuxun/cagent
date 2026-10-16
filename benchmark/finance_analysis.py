@@ -26,9 +26,10 @@ _PAGE_MARK = re.compile(r"<!-- page (\d+) -->")
 _PAGE_CITE = re.compile(r"p\.\s?(\d+)")
 _YEAR = re.compile(r"(?:19|20)\d{2}")
 _NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
-_SECTIONS = ("## 一、生意模式", "## 二、历年经营决策", "## 三、资本回报", "## 四、数据")
-_PROSE_SECTIONS = ("## 一、生意模式", "## 三、资本回报")
+_SECTIONS = ("## 生意模式", "## 历年经营决策", "## 资本回报", "## 数据")
 _QUESTION_HEADINGS = 14
+_NUMBERED = re.compile(r"(?m)^#+\s+(?:[一二三四五六七八九十]+、|\d+[.、]\s)")
+_CITATION = re.compile(r"（见年报|（来源[:：]|course\.md")
 
 
 def selftest() -> int:
@@ -47,6 +48,11 @@ def selftest() -> int:
     allowed = {2228.2, 18.1, 403.6}
     expect("同值命中", on_evidence(2228.2, 1, allowed, tol=0.0), True)
     expect("按小数位取整命中", on_evidence(2228, 0, allowed, tol=0.0), True)
+    # 交付形态的两条硬约束：正文不留出处、标题不带编号
+    expect("正文残留出处会被抓出", bool(_CITATION.search("增长 12%（见年报 p.31）")), True)
+    expect("干净正文不报出处", bool(_CITATION.search("增长 12%，主要来自出口")), False)
+    expect("编号标题会被抓出", bool(_NUMBERED.search("## 一、生意模式")), True)
+    expect("无编号标题不报", bool(_NUMBERED.search("## 生意模式")), False)
     expect("自造数字不命中", on_evidence(2229.5, 1, allowed, tol=0.0), False)
     expect("外推数字不命中", on_evidence(4.4, 1, allowed, tol=0.0), False)
 
@@ -93,13 +99,21 @@ def evaluate(case: dict, output_root: Path, root: Path) -> int:
     if len(violations) > limit:
         problems.append(f"越界数字 {len(violations)} 个")
 
+    # 正文不该留出处标记（出处收在 sources.md 里），也不该带编号——这两条是交付形态的硬约束
+    citations = _CITATION.findall(doc)
+    if citations:
+        problems.append(f"正文残留出处标记 {len(citations)} 处（应只出现在 sources.md）")
+    numbered = _NUMBERED.findall(doc)
+    if numbered:
+        problems.append(f"标题带编号 {len(numbered)} 处（顺序由侧边目录表达）")
+
     # 14 问各一节，且每节都有正文（标题由程序写死，少一节说明装配坏了）
-    headings = re.findall(r"(?m)^### (\d+)\. ", doc)
+    headings = re.findall(r"(?m)^### (.+)$", _section_span(doc))
     expected = case.get("questions", _QUESTION_HEADINGS)
     print(f"  问题小节 {len(headings)} 个，期望 {expected}")
     if expected and len(headings) != expected:
         problems.append(f"问题小节 {len(headings)} 个，期望 {expected}")
-    empty = [number for number in headings if not _section_body(doc, number).strip()]
+    empty = [title for title in headings if not _section_body(doc, title).strip()]
     if empty:
         problems.append(f"这些问题小节没有正文：{'、'.join(empty)}")
 
@@ -113,9 +127,16 @@ def evaluate(case: dict, output_root: Path, root: Path) -> int:
     return 1 if problems else 0
 
 
-def _section_body(doc: str, number: str) -> str:
+def _section_span(doc: str) -> str:
+    """资本回报部分的正文（两个二级标题之间）。"""
+    start = doc.find("## 资本回报")
+    end = doc.find("## 数据")
+    return doc[start:end] if start >= 0 and end > start else ""
+
+
+def _section_body(doc: str, title: str) -> str:
     """取某个问题小节的正文（到下一个同级标题为止）。"""
-    match = re.search(rf"(?m)^### {re.escape(number)}\. .*?$", doc)
+    match = re.search(rf"(?m)^### {re.escape(title)}$", doc)
     if not match:
         return ""
     rest = doc[match.end():]
