@@ -20,11 +20,13 @@ import logging
 import sys
 from pathlib import Path
 
-from cagent.finance_series import evidence, load_series
 from cagent.llm import LLM
+from cagent.narratives.business import BUSINESS
+from cagent.narratives.decisions import DECISIONS
+from cagent.narratives.engine import write_section
 from cagent.questions import QUESTIONS, answer
-from cagent.sections import SECTIONS, write_section
-from cagent.wiki_render import render_doc
+from cagent.render import render_doc
+from cagent.series import evidence, load_series
 
 logger = logging.getLogger(__name__)
 
@@ -82,10 +84,10 @@ def build_report(agent: LLM, stock: str, market: str, root: Path, output_dir: Pa
     parts: list[str] = []
 
     # 一、生意模式：读原文 + 引证据（引的数字受校验）
-    business = _reuse_or_write(output_dir, "business", force, lambda: write_section(agent, SECTIONS[0], stock, market, root, evidence_text))
+    business = _reuse_or_write(output_dir, "business", force, lambda: write_section(agent, BUSINESS, stock, market, root, evidence_text))
     parts.append(_wrap("一、生意模式", business))
     # 二、历年经营决策：逐年读原文
-    decisions = _reuse_or_write(output_dir, "decisions", force, lambda: write_section(agent, SECTIONS[1], stock, market, root))
+    decisions = _reuse_or_write(output_dir, "decisions", force, lambda: write_section(agent, DECISIONS, stock, market, root))
     parts.append(_wrap("二、历年经营决策", decisions))
 
     # 三、资本回报：14 问（标题编号即阅读顺序，判据紧跟在标题下）

@@ -561,6 +561,7 @@ DETAIL_NEEDS: tuple[DetailNeed, ...] = (
     ),
 )
 DETAIL_NEED_BY_ID = {need.id: need for need in DETAIL_NEEDS}
+DETAILS: tuple[str, ...] = tuple(need.id for need in DETAIL_NEEDS)   # 默认要抽的按需明细
 
 
 def _fit_chunks(llm: LLM, chunks: list[str], reserve_tokens: int = 6144) -> list[str]:

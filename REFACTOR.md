@@ -23,7 +23,7 @@
 | S5 | 逐问搬迁其余问题（一次一问），随明细清单切换 facts 契约形状 | 新问判据通过，且老问不倒退 | ✅ 完成（14 问 + 明细 + 契约定名） |
 | S6 | `sections.py`：生意模式与历年经营决策并入同一引用体系 | 叙述能引数字与页码，与财务节相互引用 | ✅ 完成 |
 | S7 | `report.py` + `render.py` 收口；旧 `wiki_*` 下线 | 端到端出一条完整档案，复制全文不含估值提示词 | ✅ 完成 |
-| S8 | `pipeline.py`：多公司批量、幂等、失败续跑、成本预算 | 3 家公司可复现、可续跑 | 待做 |
+| S8 | `pipeline.py`：单公司跑到底（抽事实 → 出报告），幂等可续跑；多家交给外层循环 | 单公司一条命令跑通，重跑等于接着跑 | ✅ 完成 |
 
 ## 基线（重构起点）
 
@@ -367,3 +367,37 @@
 
   - `output/wiki/cn/601633/report.md`（24,264 字符）与 `index.html`；小节文件 18 个（14 问 + 2 叙述 + 报告 + 页面）。
 - 结论：**有效果，S0–S7 全部完成**。产品从"固定维度拆解"变成"问题驱动 + 叙述节 + 可校验装配"。
+
+### 目录整理（2026-10-16）
+
+按"一个 section 一个文件、每层一个包、每个入口单独可执行"重排，顶层只留各层自身：
+
+```
+cagent/
+  llm.py          模型调用层          checks.py       校验层
+  fields.py       字段契约            facts.py        事实层（契约 + 抽取）
+  chunk.py        原文定位            series.py       序列层
+  questions/      问题层：engine.py（引擎）+ __init__.py（注册表）+ 14 个 q*.py
+  narratives/     叙述节：engine.py（引擎）+ business.py + decisions.py
+  report.py       报告装配（产品入口）  pipeline.py     单公司跑到底
+  render.py       渲染（+ templates/wiki.html）
+  ocr/            原文数字化（原样保留）   scraper/   公告抓取（原样保留）
+  tools/          开发工具：trace_web.py（+ tools/templates/）
+```
+
+- 入口全部单独可执行：`python -m cagent.questions.q19_cash_divergence`、`python -m cagent.narratives.business`、
+  `python -m cagent.report`、`python -m cagent.pipeline`、`python -m cagent.facts`、`python -m cagent.series`；
+  批量入口 `python -m cagent.questions`（可 `--question q19`）、`python -m cagent.narratives`。
+- 问题注册表改为**惰性导入**：单独执行某个问题不再连带导入其余 13 个文件（也消除了 runpy 警告）。
+- 依赖方向单向：`scraper/ocr → chunk → facts → series → questions/narratives → report → pipeline`，
+  `checks`、`fields`、`llm` 是被各层复用的底座。
+- 整理后：`cagent/*.py` 顶层 9 个模块 + 3 个包；ruff / ty / 三套离线自检通过；
+  三层基准不倒退（抽取 2/3、序列 1/1、报告 1/1）。
+
+### S8 pipeline：单公司跑到底（2026-10-16）
+
+- 做了什么：`pipeline.py` 从"批量编排"（扫目标、多公司循环、调用预算、汇总表、`CompanyResult`）简化为
+  **一家公司一条命令**：抽齐这家公司的年报事实（产物在就跳过）→ 装配报告；多家公司交给外层脚本循环调用。
+  62 行，两条路径（`run_company` + `main`）。
+- 账单：产物齐全时 0 次调用、0s（幂等）；缺失或 `--force` 时才产生调用。
+- 结论：**S0–S8 全部完成**。

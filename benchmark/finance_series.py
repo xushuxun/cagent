@@ -13,7 +13,7 @@ import json
 import sys
 from pathlib import Path
 
-from cagent.finance_series import (
+from cagent.series import (
     cash_check,
     evidence,
     income_split,
