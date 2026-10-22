@@ -58,23 +58,28 @@ def _gen(agent: Agent, stock: str, market: str, root: Path) -> str:
         </requirement>
         """
     ).strip()
-    prompt_entry = textwrap.dedent(
-        """
-        <requirement>
-        你在阅读一份上市公司年报。<business-model> 是对这家公司生意的概括，<chunk> 是年报原文。
-        分析总结"如何从零开始做这门生意", 强调这门生意的建立过程，如何做，不判断护城河强弱
-        
-        格式与话术：
-        - 强调这是AI生成的，不代表公司历史，语言简洁凝炼
-        - 用简体中文，markdown 格式
-        </requirement>
-        """
-    ).strip()
     what = agent.chat_distill(prompt_what, chunks)
-    entry = agent.chat_distill(f"<business-model>\n{what}\n</business-model>\n\n{prompt_entry}", chunks)
-    if not what or not entry:
+    if not what:
         raise ValueError("生意模式生成异常：空输出")
-    return f"# 生意模式\n\n{what}\n\n## 这门生意的建立过程\n\n{entry}\n"
+
+    # prompt_entry = textwrap.dedent(
+    #     """
+    #     <requirement>
+    #     你在阅读一份上市公司年报。<business-model> 是对这家公司生意的概括，<chunk> 是年报原文。
+    #     分析总结"如何从零开始做这门生意", 强调这门生意的建立过程，如何做，不判断护城河强弱
+
+        
+    #     格式与话术：
+    #     - 语言简洁凝炼
+    #     - 用简体中文，markdown 格式
+    #     </requirement>
+    #     """
+    # ).strip()
+    # entry = agent.chat_distill(f"<business-model>\n{what}\n</business-model>\n\n{prompt_entry}", chunks)
+    # if not entry:
+    #     raise ValueError("生意模式生成异常：空输出")
+    # return f"# 生意模式\n\n{what}\n\n## 生意过程推演 \n\n **基于年报AI生成，旨在解析业务逻辑，不代表公司历史事实**\n\n{entry}\n"
+    return f"# 生意模式\n\n{what}\n"
 
 
 def build(agent: Agent, stock: str, market: str, root: Path, output_dir: Path, force: bool = False) -> str:
