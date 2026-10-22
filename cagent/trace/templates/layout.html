@@ -1,0 +1,15 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>{% block title %}trace{% endblock %}</title>
+<style>
+body { font-family: -apple-system, "PingFang SC", sans-serif; margin: 2em auto; max-width: 60em; padding: 0 1em; color: #222; }
+a { color: #3a5a8c; text-decoration: none; }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: .4em .8em; border-bottom: 1px solid #ddd; font-size: .92em; }
+th { color: #888; font-weight: normal; }
+.record { border: 1px solid #ddd; border-radius: 6px; margin: 1em 0; overflow: hidden; }
+.record summary { padding: .5em 1em; background: #f6f4ef; cursor: pointer; font-size: .92em; color: #555; }
+.msg { padding: .6em 1em; border-top: 1px solid #eee; }
+.role { font-size: .8em; color: #3a5a8c; font-weight: bold; margin-bottom: .3em; }
+.resp { padding: .6em 1em; border-top: 1px solid #eee; background: #fbfaf7; white-space: pre-wrap; }
+pre { margin: 0; white-space: pre-wrap; word-break: break-all; font-size: .85em; font-family: ui-monospace, monospace; }
+</style></head><body>{% block body %}{% endblock %}</body></html>

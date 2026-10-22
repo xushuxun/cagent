@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+{% block body %}
+<p><a href="/">← 全部 trace</a></p>
+<h2>{{ name }}</h2>
+{% for r in records %}
+<details class="record" {% if loop.first %}open{% endif %}>
+<summary>调用 {{ loop.index }} · {{ r.request.get("model", "") }} · temp {{ r.request.get("temperature", "-") }}</summary>
+{% for m in r.request.messages %}
+<div class="msg"><div class="role">{{ m.role }}</div><pre>{{ m.content }}</pre></div>
+{% endfor %}
+<div class="msg"><div class="role">response</div><div class="resp">{{ r.response }}</div></div>
+</details>
+{% endfor %}
+{% endblock %}

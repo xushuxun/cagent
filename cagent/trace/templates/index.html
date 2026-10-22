@@ -1,0 +1,10 @@
+{% extends "layout.html" %}
+{% block body %}
+<h2>trace 文件</h2>
+<table>
+<tr><th>文件</th><th>调用数</th><th>大小</th><th>时间</th></tr>
+{% for f in files %}
+<tr><td><a href="/trace/{{ f.name }}">{{ f.name }}</a></td><td>{{ f.records }}</td><td>{{ f.size }}</td><td>{{ f.mtime }}</td></tr>
+{% endfor %}
+</table>
+{% endblock %}
