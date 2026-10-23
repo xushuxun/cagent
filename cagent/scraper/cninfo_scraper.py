@@ -169,8 +169,29 @@ def search_filings(
     announcements = fetch_filings(stock_code, date_from.strftime("%Y-%m-%d"), date_to.strftime("%Y-%m-%d"), kind)
     keep = is_annual_report if kind == "annual" else is_prospectus
     kept = [r for r in announcements if r["adjunctType"].upper() == "PDF" and keep(r["title"])]
+    if kind == "annual":
+        kept = _dedup_annual_reports(kept)
     log.info(f"搜索完成：命中 {len(announcements)} 条，滤除非 PDF 与无关公告后保留 {len(kept)} 条")
     return kept
+
+
+def _dedup_annual_reports(filings: list[dict]) -> list[dict]:
+    """同一年度多份年报（如“2021年年度报告”与“2021年年度报告（修订版）”）只保留一份：
+    优先修订版（标题含 修订/更新/更正），再按公告日期取最新，按公告日期升序返回。"""
+    by_year: dict[str, dict] = {}
+    for r in filings:
+        m = re.search(r"(20\d{2})年年度报告", r["title"])
+        year = m.group(1) if m else r["title"]
+        revised = any(k in r["title"] for k in ("修订", "更新", "更正"))
+        prev = by_year.get(year)
+        if prev is None or (revised, r["announcementDate"]) >= (prev["_revised"], prev["announcementDate"]):
+            if prev is not None and prev is not r:
+                by_year.pop(year)
+            r["_revised"] = revised
+            by_year[year] = r
+    for r in by_year.values():
+        r.pop("_revised", None)
+    return sorted(by_year.values(), key=lambda r: r["announcementDate"])
 
 
 def _filename(f: dict) -> str:

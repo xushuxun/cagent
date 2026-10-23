@@ -26,6 +26,12 @@ class Agent:
         response.raise_for_status()
         return response.json()["tokens"]
 
+    def detokenize(self, tokens: list[int]) -> str:
+        """llama.cpp 的 /detokenize：token id 列表还原文本。"""
+        response = requests.post(f"{self.base_url.removesuffix('/v1')}/detokenize", json={"tokens": tokens})
+        response.raise_for_status()
+        return response.json()["content"]
+
     def n_ctx(self) -> int:
         """服务端上下文长度（/props），缓存；调用方按它决定 prefill 预算。"""
         if not hasattr(self, "_n_ctx"):

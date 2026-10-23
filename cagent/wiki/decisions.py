@@ -53,11 +53,10 @@ def _gen_prompt(task: str) -> str:
 
 
 def _gen_one_year(agent: Agent, md_path: Path) -> str:
-    """读一份年报，写一年的两小节；两阶段生成共享 chunk 前缀。"""
     toc = Toc(agent, md_path)
-    chunks = toc.get_chapters_chunks(task="为了提取管理层对行业的判断与经营决策，找出相关章节，除了财务报表章节，都尽量召回")
+    chunks = toc.select_and_get_chapters_chunks(task="为了提取管理层对行业的判断与经营决策，找出相关章节，除了财务报表章节，都尽量召回")
     prompt_judge = _gen_prompt("你在阅读一份上市公司年报，提取管理层对行业大环境的判断。全文控制在 200 字以内。")
-    prompt_decide = _gen_prompt("你在阅读一份上市公司年报，提取管理层当年的重大经营决策。全文控制在 200 字以内。")
+    prompt_decide = _gen_prompt("你在阅读一份上市公司年报，提取管理层当年的重大经营决策，只提取业务经营相关的，不要其他决策。全文控制在 200 字以内。")
     judge = agent.chat_distill(prompt_judge, chunks)
     decide = agent.chat_distill(prompt_decide, chunks)
     if not judge or not decide:
@@ -74,7 +73,7 @@ def _gen(agent: Agent, stock: str, market: str, root: Path) -> str:
 
     parts = ["# 历年经营决策\n"]
     for md_path in mds[-_WINDOW:]:
-        logger.info(f"{md_path.name}")
+        logger.info(f"get decisions from {md_path.name}")
         parts.append(f"## {_report_year(agent, md_path)}\n")
         parts.append(_gen_one_year(agent, md_path))
     return "\n".join(parts).strip() + "\n"

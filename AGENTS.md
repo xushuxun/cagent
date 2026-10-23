@@ -25,7 +25,8 @@
 1. **抓取**（`cagent/scraper/`）：从巨潮（cninfo，A股）/ 披露易（HKEx，港股）下载年报 PDF 到 raw 层。
 2. **OCR 解析**（`cagent/ocr/`）：PDF → 图片（pypdfium2，按字符角度自动转正）→ OvisOCR2 → markdown，写入 derived 层，页间用 `<!-- page N -->` 分隔。
 3. **章节定位**（`cagent/core/chunk.py`）：用文本模型从目录页提取章节目录并逐页对齐物理页号，产出 `.toc.json`。
-4. **分析生成**（`cagent/wiki/`）：按任务挑章节、切块、调文本模型生成报告节（生意模式、历年经营决策等），mistune+jinja2 渲染成带侧边目录的 HTML。
+4. **表格索引**（`cagent/core/tables.py`）：扫财务报告章节建 `.tables.json`（第一层原表索引，跨页连续记为一条、页列表定位；第二层附注/续表关联待实现、独立 json），每次运行覆盖写，后续按索引回原文取表。
+5. **分析生成**（`cagent/wiki/`）：按任务挑章节、切块、调文本模型生成报告节（生意模式、历年经营决策等），mistune+jinja2 渲染成带侧边目录的 HTML。
 
 LLM 调用统一收口在 `cagent/core/agent.py` 的 `Agent.chat()`（OpenAI 兼容 `/chat/completions` 接口，支持 json_schema 约束输出、trace 记账）。
 
@@ -33,7 +34,7 @@ LLM 调用统一收口在 `cagent/core/agent.py` 的 `Agent.chat()`（OpenAI 兼
 
 ```
 cagent/
-├── core/          # 底层件：agent.py（LLM 客户端，所有生成的唯一出口）、chunk.py（章节定位/切块）、storage.py（index.json 读写、原子写）
+├── core/          # 底层件：agent.py（LLM 客户端，所有生成的唯一出口）、chunk.py（章节定位/切块）、tables.py（财务表格第一层索引：原表索引，跨页连续记为一条）、storage.py（index.json 读写、原子写）
 ├── scraper/       # 年报爬虫：cli.py（入口）、cninfo_scraper.py（A股）、hkex_scraper.py（港股）
 ├── ocr/           # PDF→md：cli.py（入口）、pdf_utils.py（渲染+转正）、llm_utils.py（vLLM 客户端）
 ├── wiki/          # 报告生成：business.py（生意模式）、decisions.py（历年经营决策）、render.py（md→HTML）
@@ -64,7 +65,10 @@ uv run cagent/ocr/cli.py --stock 09863 --market hk
 # ③ 构建章节目录 toc.json
 uv run python -m cagent.core.chunk --stock 601633 --market cn
 
-# ④ 生成报告节
+# ④ 构建财务表格索引 tables.json（第一层：原表索引，每次覆盖写）
+uv run python -m cagent.core.tables --stock 601633 --market cn
+
+# ⑤ 生成报告节
 uv run python -m cagent.wiki.business  --stock 601633 --market cn
 uv run python -m cagent.wiki.decisions --stock 601633 --market cn
 

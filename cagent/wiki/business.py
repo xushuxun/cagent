@@ -34,9 +34,9 @@ def _get_latest_annual(stock: str, market: str, root: Path) -> Path:
 
 def _gen(agent: Agent, stock: str, market: str, root: Path) -> str:
     md_path = _get_latest_annual(stock, market, root)
-    logger.info(f"select {md_path}")
+    logger.info(f"select for business: {md_path}")
     toc = Toc(agent, md_path)
-    chunks = toc.get_chapters_chunks(
+    chunks = toc.select_and_get_chapters_chunks(
         task="为了搞清楚企业生意模式，找出相关章节，除了财务报表章节，都尽量召回"
     )
     # 两阶段生成：先写"生意是什么"，再增量写"从零开始"。

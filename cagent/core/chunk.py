@@ -312,7 +312,8 @@ class Toc:
         # ]
         self.chapters = json.loads(toc_file.read_text(encoding="utf-8"))
         self.text = md_path.read_text(encoding="utf-8")
-        self.n_pages = len(_split_pages(self.text))
+        self.pages = _split_pages(self.text)
+        self.n_pages = len(self.pages)
 
     def _build_toc(self, md_path: Path) -> None:
         """跑 TOC 管线，把对齐结果写到 md 同目录的 <stem>.toc.json。"""
@@ -340,7 +341,14 @@ class Toc:
         out.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
         logger.info(f"输出 TOC: {out} ({len(payload)} 章)")
 
-    def pick_chapters(self, task: str) -> list[int]:
+    def get_chapter_page_range(self, index: int) -> tuple[int, int]:
+        """选中章节的 [(起始页, 结束页)]，页码为物理页码。"""
+        i = index
+        start = self.chapters[i]["md_page"]
+        end = self.chapters[i + 1]["md_page"] - 1 if i + 1 < len(self.chapters) else self.n_pages
+        return (start, end)
+
+    def select_chapters(self, task: str) -> list[int]:
         listing = "\n".join(f'<chapter index="{index}">\n{chapter["title"]}\n</chapter>' for index, chapter in enumerate(self.chapters))
         prompt = textwrap.dedent(f"""
             <requirements>
@@ -366,12 +374,15 @@ class Toc:
             prompt = f"{prompt}\n\n<retry>上一次返回的序号不在 0 到 {len(self.chapters) - 1} 之间，请重新给。</retry>"
         raise ValueError("模型没有返回有效章节序号")
 
-    def get_chapters_chunks(self, task: str, decode_reserve: int = 4096) -> list[str]:
+    def select_and_get_chapters_chunks(self, task: str, decode_reserve: int = 4096) -> list[str]:
         """按任务选章节，合并成若干 chunk，总 token 数不超 n_ctx - decode_reserve。"""
+        select_chapters_index = self.select_chapters(task)
+        logger.info(f"tasks: {task} select chapters: {[self.chapters[i]["title"] for i in select_chapters_index]}")
+
         budget = self.n_ctx - decode_reserve
         chunks, current = [], ""
-        for index in self.pick_chapters(task):
-            for piece in self._chapter_chunks(index):
+        for index in select_chapters_index:
+            for piece in self.get_chapter_chunks_by_index(index):
                 candidate = f"{current}\n\n{piece}" if current else piece
                 if current and len(self.agent.tokenize(candidate)) > budget:
                     chunks.append(current)
@@ -382,7 +393,7 @@ class Toc:
             chunks.append(current)
         return chunks
 
-    def _chapter_chunks(self, index: int, budget: int = 32768) -> list[str]:
+    def get_chapter_chunks_by_index(self, index: int, budget: int = 32768) -> list[str]:
         """第 index 章的原文切块；切口优先落在 md 标题处，标题间距超预算时退回硬切。"""
         chapters = self.chapters
         start = chapters[index]["md_page"]
