@@ -64,8 +64,8 @@ class Agent:
             self._trace(data, content)
         return content
 
-    def chat_json(self, prompt: str, schema: dict, max_tokens: int | None = None) -> dict:
-        return json.loads(self.chat(prompt, schema=schema, max_tokens=max_tokens))
+    def chat_json(self, prompt: str, schema: dict, max_tokens: int | None = None, temperature: float = 0) -> dict:
+        return json.loads(self.chat(prompt, schema=schema, max_tokens=max_tokens, temperature=temperature))
 
     def fits_budget(self, text: str, reserve: int = 8192) -> bool:
         """按上下文预算判断：文本装得下直读（再留 reserve 给输出）。"""
