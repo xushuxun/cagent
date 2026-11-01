@@ -9,7 +9,7 @@
 幂等断点续跑：<stem>.statements/ 目录已存在则跳过，重跑同一命令即可续跑。
 
 分工（见 docs/reader-plan.md）：通过 TOC 选择财报章节；程序给表格单元格编号，模型只选择科目与
-当期单元格，程序直读数值并做原文核验，不做恒等式检测。
+当期单元格，程序直读数值并做原文核验。RLM 只对固定合计目标配平，失败仅告警。
 
 产物布局（每年报一个目录，关联信息后续并列加入）：
     derived/<stem>.statements/
@@ -29,6 +29,7 @@ from pathlib import Path
 from cagent.core.agent import Agent
 from cagent.core.chunk import Toc
 from cagent.core.storage import atomic_write
+from cagent.report.check import check_statement
 from cagent.report.source import grid_pages, materialize_rows, verify_rows
 
 logger = logging.getLogger(__name__)
@@ -224,6 +225,10 @@ def extract_file(agent: Agent, md_path: Path, force: bool = False) -> Path | Non
             logger.warning(f"  {kind} 第 {attempt + 1} 轮有 {len(source_issues)} 项原文核验失败，反馈修正")
             if attempt < 2:
                 rows = _repair_rows(agent, rows, source_issues, source_pages, start)
+        checks = check_statement(agent, rows, kind)
+        failed = [check for check in checks if not check["ok"]]
+        if failed:
+            logger.warning(f"  {kind} 有 {len(failed)} 项配平告警: {[check['item'] for check in failed]}")
         payload = {
             "title": _TITLES[kind],
             "start_page": start,
@@ -232,6 +237,7 @@ def extract_file(agent: Agent, md_path: Path, force: bool = False) -> Path | Non
             "rows": rows,
             "source_checks": source_issues,
             "source_passed": f"{len(rows) - len(source_issues)}/{len(rows)}",
+            "checks": checks,
         }
         atomic_write(out_dir / f"{kind}.json", (json.dumps(payload, ensure_ascii=False, indent=1) + "\n").encode("utf-8"))
         logger.info(f"  {kind}: {len(rows)} 行, 原文核验 {payload['source_passed']}")

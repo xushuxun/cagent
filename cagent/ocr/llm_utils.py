@@ -3,7 +3,7 @@ import asyncio
 import httpx2
 
 BASE_URL = "http://localhost:8000"
-MODEL = "OvisOCR2"
+MODEL = "OvisOCR3"
 TIMEOUT = 300
 MAX_TOKENS = 32768
 PAGE_CONCURRENCY = 32
@@ -33,11 +33,11 @@ async def request_llm(client: httpx2.AsyncClient, img_base64: str, temperature: 
             {
                 "role": "user",
                 "content": [
+                    {"type": "text", "text": OCR_PROMPT},
                     {
                         "type": "image_url",
                         "image_url": {"url": f"data:image/png;base64,{img_base64}"},
                     },
-                    {"type": "text", "text": OCR_PROMPT},
                 ],
             }
         ],

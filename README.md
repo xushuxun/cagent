@@ -23,7 +23,7 @@
 
 - [Qwen3.6-35B-A3B-MTP-GGUF](https://www.modelscope.cn/models/unsloth/Qwen3.6-35B-A3B-MTP-GGUF)
   文本生成（标注、摘要、叙事、装配、对账），
-- [OvisOCR2](https://www.modelscope.cn/models/ATH-MaaS/OvisOCR2)
+- [OvisOCR2](https://www.modelscope.cn/models/ATH-MaaS/OvisOCR3)
   端到端把 PDF 页面转成 markdown（表格 HTML、公式 LaTeX），vLLM 服务托管。
 
 端到端入口会自动启停文本服务；下面是手工启动的命令
@@ -34,7 +34,7 @@
 llama-server \
   -m ~/.cache/modelscope/models/unsloth--Qwen3.6-35B-A3B-MTP-GGUF/snapshots/master/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf  \
   --spec-type draft-mtp --spec-draft-n-max 2 \
-  -c 131072 -ngl 99 -ncmoe 30 -fa on \
+  -c 65536 -ngl 99 -ncmoe 28 -fa on \
   -ctk q8_0 -ctv q8_0 \
   -b 2048 -ub 2048 \
   -t 8 -np 1 --fit off --port 9931 --reasoning off --load-mode mlock
@@ -43,9 +43,9 @@ llama-server \
 ```bash
 # OCR 服务：端口 8000
 vllm serve \
-  ~/.cache/modelscope/models/ATH-MaaS--OvisOCR2/snapshots/master/ \
+  ~/.cache/modelscope/models/ATH-MaaS--OvisOCR3/snapshots/master/ \
   --trust-remote-code \
-  --served-model-name OvisOCR2 \
+  --served-model-name OvisOCR3 \
   --mm-processor-cache-gb 0 \
   --max-model-len 65536 \
   --gpu-memory-utilization 0.80
