@@ -20,10 +20,19 @@
   .summary { margin:10px 0; color:var(--muted); } .summary .bad { color:var(--bad); }
   table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
   th { padding:9px 12px; text-align:left; color:var(--muted); font-weight:500; border-bottom:1px solid var(--ink); }
-  th:nth-child(2), th:nth-child(3), td:nth-child(2), td:nth-child(3) { text-align:right; }
+  th:nth-child(2), td:nth-child(2) { text-align:right; }
   td { padding:7px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
   td.num { white-space:nowrap; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
   tr.section td { color:var(--muted); font-weight:600; padding-top:18px; }
+  tr.has-context { cursor:pointer; } tr.has-context:hover td, tr.expanded td { background:var(--panel); }
+  tr.has-context td:first-child::after { content:'＋'; margin-left:8px; color:var(--accent); font-size:12px; }
+  tr.expanded td:first-child::after { content:'−'; }
+  .detail td { padding:0 12px 20px; background:var(--panel); text-align:left !important; }
+  .context { padding:16px 20px; border-left:2px solid var(--accent); }
+  .context h3 { margin:0 0 12px; font-size:14px; } .context h4 { margin:18px 0 6px; font-size:14px; }
+  .context .page { color:var(--muted); font-size:12px; font-weight:400; margin-left:8px; }
+  .context table { margin:8px 0 16px; background:white; } .context th, .context td { padding:6px 8px; border:1px solid var(--line); }
+  .context p { margin:7px 0; }
   @media (max-width:800px) { nav { display:none; } .layout { padding:0 12px 50px; } header span { display:block; margin:4px 0 0; } }
 </style>
 </head>
@@ -35,21 +44,49 @@
 {% for statement in statements %}
 <section id="{{ loop.index }}">
   <h1>{{ statement.title }}</h1>
-  <h2>物理页 {{ statement.start_page }}–{{ statement.end_page }}</h2>
+  <h2>页 {{ statement.start_page }}–{{ statement.end_page }}</h2>
   <div class="summary">{{ statement.n_rows }} 行 · 原文核验 {{ statement.source_passed }}</div>
   <table>
-    <thead><tr><th>项目</th><th>附注</th><th>本期金额</th></tr></thead>
+    <thead><tr><th>项目</th><th>本期金额</th></tr></thead>
     <tbody>
     {% for row in statement.rows %}
-      <tr class="{{ 'section' if row.value is none else '' }}">
-        <td>{{ row.item }}</td><td class="num">{{ row.note }}</td><td class="num">{{ amount(row.value) }}</td>
+      {% set has_context = row.notes %}
+      <tr class="{{ 'section' if row.value is none else '' }}{{ ' has-context' if has_context else '' }}" {% if has_context %}tabindex="0" role="button" aria-expanded="false"{% endif %}>
+        <td>{{ row.item }}</td><td class="num">{{ amount(row.value) }}</td>
       </tr>
+      {% if has_context %}
+      <tr class="detail" hidden><td colspan="2"><div class="context">
+        <h3>报表项目附注</h3>
+        {% for entry in row.notes %}<h4>{{ entry.title }}<span class="page">页 {{ entry.start_page }}</span></h4>{{ entry.content|safe }}{% endfor %}
+      </div></td></tr>
+      {% endif %}
     {% endfor %}
     </tbody>
   </table>
+  {% set failed = statement.checks|selectattr('ok', 'equalto', false)|list %}
+  {% if failed %}
+  <div class="summary bad">配平告警 {{ failed|length }} 项</div>
+  {% for check in failed %}
+  <div class="summary bad">{{ check.item }}：报表值 {{ check.reported }}{% if check.computed %}，最接近计算值 {{ check.computed }}{% endif %}</div>
+  {% endfor %}
+  {% endif %}
 </section>
 {% endfor %}
 </main>
 </div>
+<script>
+for (const row of document.querySelectorAll('tr.has-context')) {
+  const toggle = () => {
+    const detail = row.nextElementSibling;
+    detail.hidden = !detail.hidden;
+    row.classList.toggle('expanded', !detail.hidden);
+    row.setAttribute('aria-expanded', String(!detail.hidden));
+  };
+  row.addEventListener('click', toggle);
+  row.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); }
+  });
+}
+</script>
 </body>
 </html>

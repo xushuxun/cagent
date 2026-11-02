@@ -30,7 +30,7 @@
   - 历年同项金额小图/表；
   - 原年报对应段落的文本引用（标注物理页号，作为展示内容的一部分，不离开报表页）。
 - **原文查看器**：独立页面按页渲染 markdown 原文，与报表视图互相跳转（报表联动面板中给原文页链接），属于补充入口而非主路径。
-- 入口：`uv run python -m cagent.report.server --stock 601633 --market cn`。
+- 入口：`uv run python -m cagent.table.server --stock 601633 --market cn`。
 
 ## 范围外（Out of Scope）
 
@@ -41,7 +41,7 @@
 ## 关键设计约束
 
 - 每个数字必须带物理页号（`<!-- page N -->` 口径），点击可达原文。
-- 表格定位、科目与当期单元格选择等理解活交给模型且在 trace 记账；程序负责单元格编号、直读数值和原文核验，不做恒等式检测。
+- 表格定位、科目与当期单元格选择等理解活交给模型且在 trace 记账；程序负责单元格编号、直读数值和原文核验。RLM 只对固定合计目标尝试配平，失败仅告警。
 - 全部读取现有 lakehouse 产物，幂等：产物已存在则跳过，`--force` 覆盖。
 - 沿用项目存储规范（`lakehouse/README.md`），新产物命名 `statements.json` / `notes_map.json` 存 derived 层。
 

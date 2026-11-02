@@ -38,7 +38,7 @@ cagent/
 ├── scraper/       # 年报爬虫：cli.py（入口）、cninfo_scraper.py（A股）、hkex_scraper.py（港股）
 ├── ocr/           # PDF→md：cli.py（入口）、pdf_utils.py（渲染+转正）、llm_utils.py（vLLM 客户端）
 ├── wiki/          # 报告生成：business.py（生意模式）、decisions.py（历年经营决策）、render.py（md→HTML）
-├── report/        # 财务报表阅读器：extract.py（合并三大主表提取→statements.json，见 docs/prd-reader.md）
+├── table/         # 财务报表阅读器：extract.py（合并三大主表提取→statements.json，见 docs/prd-reader.md）
 ├── trace/         # LLM 调用 trace 的 Flask 可视化（server.py + templates/）
 ├── templates/     # wiki.html 报告模板
 lakehouse/         # 公告文件库存储规范（README.md）+ 股票池名单（cn/hk/auto_stocks.json）

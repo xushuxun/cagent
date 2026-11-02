@@ -1,10 +1,10 @@
 """合并三大主表提取 cli：
 
     # 提取某公司 derived/ 下所有年报的合并三大主表，已有的跳过
-    uv run python -m cagent.report.extract --stock 601633 --market cn
+    uv run python -m cagent.table.extract --stock 601633 --market cn
 
     # 单文件调试
-    uv run python -m cagent.report.extract -i .cagent/cn/601633/derived/2026-03-28_1225047452.md
+    uv run python -m cagent.table.extract -i .cagent/cn/601633/derived/2026-03-28_1225047452.md
 
 幂等断点续跑：<stem>.statements/ 目录已存在则跳过，重跑同一命令即可续跑。
 
@@ -17,7 +17,7 @@
     ├── bs.json     # 合并资产负债表 {"title", "start_page", "end_page", "rows", "source_checks"}
     ├── is.json     # 合并利润表
     └── cf.json     # 合并现金流量表
-rows 含 item/note/value/raw_value 及 page/table/row/column 原文坐标。
+rows 含 item/value/raw_value 及 page/table/row/column 原文坐标。
 """
 
 import argparse
@@ -29,8 +29,8 @@ from pathlib import Path
 from cagent.core.agent import Agent
 from cagent.core.chunk import Toc
 from cagent.core.storage import atomic_write
-from cagent.report.check import check_statement
-from cagent.report.source import grid_pages, materialize_rows, verify_rows
+from cagent.table.check import check_statement
+from cagent.table.source import grid_pages, materialize_rows, verify_rows
 
 logger = logging.getLogger(__name__)
 
@@ -94,13 +94,12 @@ def _selection_schema() -> dict:
                     "type": "object",
                     "properties": {
                         "item": {"type": "string", "description": "纯科目名，不带序号或列示前缀"},
-                        "note": {"type": "string", "description": "附注编号，没有则为空字符串"},
                         "page": {"type": "integer"},
                         "table": {"type": "integer"},
                         "item_cell": {"type": "string", "description": "科目单元格，如 r1c0"},
                         "value_cell": {"type": "string", "description": "当期金额单元格，无金额则为空字符串"},
                     },
-                    "required": ["item", "note", "page", "table", "item_cell", "value_cell"],
+                    "required": ["item", "page", "table", "item_cell", "value_cell"],
                 },
             }
         },
@@ -113,7 +112,7 @@ def _extract_prompt(kind: str, start: int, end: int, pages: list[str]) -> str:
     grid = grid_pages(pages[start - 1 : end], start)
     return f"""这是财务报表提取。逐行选择「{title}」的科目和当期金额单元格：
 - item 只保留纯科目名，去掉序号和“其中/加/减”等列示前缀，例如“(一)基本每股收益”输出“基本每股收益”，“其中:利息费用”输出“利息费用”。
-- note 填附注编号；不要输出金额，value_cell 由程序取值。
+- 不要输出金额，value_cell 由程序取值。
 - page/table 使用原文标号，item_cell/value_cell 使用程序给出的 r行c列坐标。
 - 无金额时 value_cell 留空；表头和单位不要输出；按原文行序输出。
 
@@ -166,7 +165,6 @@ def _repair_rows(agent: Agent, rows: list[dict], mismatches: list[dict], source_
     selections = [
         {
             "item": row["item"],
-            "note": row["note"],
             "page": row["page"],
             "table": row["table"],
             "item_cell": f"r{row['row']}c{row['column']}",
@@ -218,6 +216,7 @@ def extract_file(agent: Agent, md_path: Path, force: bool = False) -> Path | Non
     for kind, (start, end) in sorted(ranges.items()):
         source_pages = pages[start - 1 : end]
         rows = _extract_rows(agent, kind, start, end, pages)
+        source_issues = []
         for attempt in range(3):
             source_issues = verify_rows(rows, source_pages, start)
             if not source_issues:

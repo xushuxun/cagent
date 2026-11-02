@@ -6,6 +6,8 @@ from html.parser import HTMLParser
 
 
 class _Tables(HTMLParser):
+    """保留 table/row/cell 顺序，供 r行c列坐标回读。"""
+
     def __init__(self):
         super().__init__()
         self.tables: list[list[list[str]]] = []
@@ -57,12 +59,8 @@ def _amount(text: str) -> Decimal | None:
 
 
 def verify_rows(rows: list[dict], pages: list[str], start: int) -> list[dict]:
-    tables_by_page = {}
-    for page in range(start, start + len(pages)):
-        parser = _Tables()
-        parser.feed(pages[page - start])
-        tables_by_page[page] = parser.tables
-
+    """逐行回读原单元格；只报告坐标或数值不符，不修改提取结果。"""
+    tables_by_page = {start + offset: parse_tables(text) for offset, text in enumerate(pages)}
     issues = []
     for index, row in enumerate(rows):
         cell = _cell(tables_by_page.get(row["page"], []), row)
@@ -83,6 +81,13 @@ def parse_tables(text: str) -> list[list[list[str]]]:
 
 
 def grid_pages(pages: list[str], start: int) -> str:
+    """把表格展开成带物理页号和单元格坐标的文本，供模型选择。
+
+    例如第 142 页的 <table><tr><td>存货</td><td>1,200</td></tr></table> 会展开为：
+    <page index="142"><table index="0">
+    r0c0=存货 | r0c1=1,200
+    </table></page>
+    """
     parts = []
     for offset, text in enumerate(pages):
         parts.append(f'<page index="{start + offset}">')
@@ -96,6 +101,13 @@ def grid_pages(pages: list[str], start: int) -> str:
 
 
 def materialize_rows(selections: list[dict], pages: list[str], start: int, current_columns: dict[tuple[int, int], int] | None = None) -> list[dict]:
+    """按模型选择直读数值；current_columns 仅用于首次提取时限定当期列。
+
+    例如模型选择 {"item": "存货", "page": 142, "table": 0, "value_cell": "r0c1"}，
+    对应原文为 1,200，则输出 {"item": "存货", "value": 1200, "raw_value": "1,200",
+    "page": 142, "table": 0, "row": 0, "column": 1}。
+    若 current_columns={(142, 0): 2}，上述 r0c1 会因不在当期列而被拒绝。
+    """
     tables = {start + offset: parse_tables(text) for offset, text in enumerate(pages)}
     rows = []
     for selection in selections:
@@ -115,7 +127,6 @@ def materialize_rows(selections: list[dict], pages: list[str], start: int, curre
         rows.append(
             {
                 "item": selection["item"],
-                "note": selection["note"],
                 "value": int(value) if value is not None and value == value.to_integral() else float(value) if value is not None else None,
                 "raw_value": raw_value if selection["value_cell"] else "",
                 **source,
