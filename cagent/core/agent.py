@@ -13,7 +13,7 @@ TRACE_DIR = Path("output/trace")
 
 
 class Agent:
-    def __init__(self, base_url: str = "http://localhost:9931/v1", model: str = "", trace: bool = False):
+    def __init__(self, base_url: str = "http://localhost:8080/v1", model: str = "", trace: bool = False):
         self.base_url = base_url
         self.model = model
         self.trace = trace
@@ -47,6 +47,7 @@ class Agent:
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": max_tokens or DEFAULT_MAX_TOKENS,
             "temperature": temperature,
+            "reasoning_effort": "none"
         }
         if schema is not None:
             data["response_format"] = {"type": "json_schema", "json_schema": {"name": "response", "schema": schema}}

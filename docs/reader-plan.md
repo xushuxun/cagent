@@ -17,16 +17,16 @@
 4. 程序拒绝非当期列，直读单元格并生成 `value`、`raw_value` 和原文坐标。
 5. 千分位、括号负数、空值等由程序做确定性转换。
 6. 原文坐标或数值核验失败时，反馈 LLM 局部修正选择；仍失败则保留失败信息。
-7. RLM 只对固定的合计目标尝试求和配平，无法配平时告警，不反向修改提取数字。
+7. LLM 用行下标标记固定合计目标的等式两侧，程序执行配平；无法配平时告警，不反向修改提取数字。
 
 ## 产物
 
 ```text
 derived/<stem>.statements/
 ├── meta.json   # 文件名、币种、金额单位、通用备注、三表页码范围
-├── bs.json     # 合并资产负债表
-├── is.json     # 合并利润表
-├── cf.json     # 合并现金流量表
+├── balance_sheet.json     # 合并资产负债表
+├── income_statement.json     # 合并利润表
+├── cash_flow.json     # 合并现金流量表
 └── context.json # 报表项目附注原文及科目关联
 ```
 
@@ -37,9 +37,9 @@ derived/<stem>.statements/
 - `source_checks`：原文核验失败项；
 - `source_passed`：原文核验通过数/总行数。
 
-关联入口：`cagent/table/context.py`。模型回读主表原文，结合附注表头、行内编号和科目语义关联项目附注；程序按原文切取内容，排除母公司附注，不修改主表数值。
+关联入口：`cagent/statements/context.py`。模型回读主表原文，结合附注表头、行内编号和科目语义关联项目附注；程序按原文切取内容，排除母公司附注，不修改主表数值。
 
-渲染入口：`cagent/table/render.py`；HTML 模板：`cagent/templates/statements.html`。静态页面一次载入关联内容，点击科目原地展开项目附注。
+渲染入口：`cagent/statements/render.py`；HTML 模板：`cagent/templates/statements.html`。静态页面一次载入关联内容，点击科目原地展开项目附注。
 
 ## 当前验证状态
 

@@ -5,88 +5,46 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ meta.file }} · 合并财务报表</title>
 <style>
-  :root { --ink:#20242a; --muted:#6d737c; --line:#e7e9ec; --panel:#f6f7f9; --accent:#2563eb; --bad:#b42318; }
+  :root { --ink:#20242a; --muted:#6d737c; --line:#e7e9ec; --ok:#2563eb; }
   * { box-sizing:border-box; }
-  body { margin:0; color:var(--ink); font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
-  header { position:sticky; top:0; z-index:5; padding:16px 28px; background:rgba(255,255,255,.95); border-bottom:1px solid var(--line); backdrop-filter:blur(8px); }
-  header b { font-size:17px; } header span { margin-left:16px; color:var(--muted); }
-  .layout { display:flex; max-width:1280px; margin:auto; padding:0 28px 70px; gap:36px; }
-  nav { position:sticky; top:82px; flex:0 0 190px; padding-top:28px; }
-  nav a { display:block; padding:7px 10px; color:var(--muted); text-decoration:none; border-left:2px solid var(--line); }
-  nav a:hover { color:var(--accent); border-left-color:var(--accent); }
-  main { flex:1; min-width:0; }
-  section { padding-top:28px; scroll-margin-top:70px; }
-  h1 { font-size:21px; margin:0 0 5px; } h2 { font-size:14px; font-weight:400; color:var(--muted); margin:0 0 18px; }
-  .summary { margin:10px 0; color:var(--muted); } .summary .bad { color:var(--bad); }
+  body { max-width:1180px; margin:0 auto; padding:24px; color:var(--ink); font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+  header { margin-bottom:28px; } header b { font-size:22px; } header span { display:block; color:var(--muted); margin-top:5px; }
+  section { margin-bottom:42px; }
+  h1 { font-size:20px; margin:0 0 4px; } h2 { font-size:13px; font-weight:400; color:var(--muted); margin:0 0 14px; }
   table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
-  th { padding:9px 12px; text-align:left; color:var(--muted); font-weight:500; border-bottom:1px solid var(--ink); }
+  th { padding:8px 10px; text-align:left; color:var(--muted); font-weight:500; border-bottom:1px solid var(--ink); }
   th:nth-child(2), td:nth-child(2) { text-align:right; }
-  td { padding:7px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+  td { padding:6px 10px; border-bottom:1px solid var(--line); }
   td.num { white-space:nowrap; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
-  tr.section td { color:var(--muted); font-weight:600; padding-top:18px; }
-  tr.has-context { cursor:pointer; } tr.has-context:hover td, tr.expanded td { background:var(--panel); }
-  tr.has-context td:first-child::after { content:'＋'; margin-left:8px; color:var(--accent); font-size:12px; }
-  tr.expanded td:first-child::after { content:'−'; }
-  .detail td { padding:0 12px 20px; background:var(--panel); text-align:left !important; }
-  .context { padding:16px 20px; border-left:2px solid var(--accent); }
-  .context h3 { margin:0 0 12px; font-size:14px; } .context h4 { margin:18px 0 6px; font-size:14px; }
-  .context .page { color:var(--muted); font-size:12px; font-weight:400; margin-left:8px; }
-  .context table { margin:8px 0 16px; background:white; } .context th, .context td { padding:6px 8px; border:1px solid var(--line); }
-  .context p { margin:7px 0; }
-  @media (max-width:800px) { nav { display:none; } .layout { padding:0 12px 50px; } header span { display:block; margin:4px 0 0; } }
+  .item { display:inline-block; margin-left:calc(var(--depth) * 22px); }
+  tr.section td { color:var(--muted); font-weight:600; }
+  .checks { margin-top:14px; color:var(--muted); }
+  .check { margin:5px 0; overflow-wrap:anywhere; }
+  .check::before { content:'✓'; color:var(--ok); margin-right:7px; }
+  @media (max-width:700px) { body { padding:12px; } .item { margin-left:calc(var(--depth) * 12px); } }
 </style>
 </head>
 <body>
-<header><b>合并财务报表</b><span>{{ meta.file }} · {{ meta.currency }} · 单位：{{ meta.unit }}</span></header>
-<div class="layout">
-<nav>{% for statement in statements %}<a href="#{{ loop.index }}">{{ statement.title }}</a>{% endfor %}</nav>
-<main>
+<header><b>合并财务报表</b><span>{{ meta.file }}</span></header>
 {% for statement in statements %}
-<section id="{{ loop.index }}">
+<section>
   <h1>{{ statement.title }}</h1>
-  <h2>页 {{ statement.start_page }}–{{ statement.end_page }}</h2>
-  <div class="summary">{{ statement.n_rows }} 行 · 原文核验 {{ statement.source_passed }}</div>
+  <h2>物理页 {{ statement.start_page }}–{{ statement.end_page }} · {{ statement.rows|length }} 行 · {{ statement.checks|length }} 项恒等式通过</h2>
   <table>
     <thead><tr><th>项目</th><th>本期金额</th></tr></thead>
     <tbody>
     {% for row in statement.rows %}
-      {% set has_context = row.notes %}
-      <tr class="{{ 'section' if row.value is none else '' }}{{ ' has-context' if has_context else '' }}" {% if has_context %}tabindex="0" role="button" aria-expanded="false"{% endif %}>
-        <td>{{ row.item }}</td><td class="num">{{ amount(row.value) }}</td>
+      <tr class="{{ 'section' if row.value is none else '' }}">
+        <td><span class="item" style="--depth:{{ row.depth }}">{{ row.item }}</span></td>
+        <td class="num">{{ amount(row.value) }}</td>
       </tr>
-      {% if has_context %}
-      <tr class="detail" hidden><td colspan="2"><div class="context">
-        <h3>报表项目附注</h3>
-        {% for entry in row.notes %}<h4>{{ entry.title }}<span class="page">页 {{ entry.start_page }}</span></h4>{{ entry.content|safe }}{% endfor %}
-      </div></td></tr>
-      {% endif %}
     {% endfor %}
     </tbody>
   </table>
-  {% set failed = statement.checks|selectattr('ok', 'equalto', false)|list %}
-  {% if failed %}
-  <div class="summary bad">配平告警 {{ failed|length }} 项</div>
-  {% for check in failed %}
-  <div class="summary bad">{{ check.item }}：报表值 {{ check.reported }}{% if check.computed %}，最接近计算值 {{ check.computed }}{% endif %}</div>
-  {% endfor %}
-  {% endif %}
+  <div class="checks">
+  {% for check in statement.checks %}<div class="check">{{ check.equation }}</div>{% endfor %}
+  </div>
 </section>
 {% endfor %}
-</main>
-</div>
-<script>
-for (const row of document.querySelectorAll('tr.has-context')) {
-  const toggle = () => {
-    const detail = row.nextElementSibling;
-    detail.hidden = !detail.hidden;
-    row.classList.toggle('expanded', !detail.hidden);
-    row.setAttribute('aria-expanded', String(!detail.hidden));
-  };
-  row.addEventListener('click', toggle);
-  row.addEventListener('keydown', event => {
-    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); }
-  });
-}
-</script>
 </body>
 </html>
