@@ -21,23 +21,18 @@
 
 ## 依赖模型
 
-- [Qwen3.6-35B-A3B-MTP-GGUF](https://www.modelscope.cn/models/unsloth/Qwen3.6-35B-A3B-MTP-GGUF)
-  文本生成（标注、摘要、叙事、装配、对账），
-- [OvisOCR2](https://www.modelscope.cn/models/ATH-MaaS/OvisOCR3)
+- [Qwen3.8-Flash-Next-GSQ-RCO-GGUF](https://www.modelscope.cn/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF)
+  文本生成（标注、摘要、叙事、装配、对账），Strata 服务托管
+- [OvisOCR3](https://www.modelscope.cn/models/ATH-MaaS/OvisOCR3)
   端到端把 PDF 页面转成 markdown（表格 HTML、公式 LaTeX），vLLM 服务托管。
 
 端到端入口会自动启停文本服务；下面是手工启动的命令
 
-```bash
-# 文本服务：端口必须是 9931（与分析代码里写死的服务地址一致）
-# 不必指定模型：主入口连上服务后自动用它当前加载的那个
-llama-server \
-  -m ~/.cache/modelscope/models/unsloth--Qwen3.6-35B-A3B-MTP-GGUF/snapshots/master/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf  \
-  --spec-type draft-mtp --spec-draft-n-max 2 \
-  -c 65536 -ngl 99 -ncmoe 28 -fa on \
-  -ctk q8_0 -ctv q8_0 \
-  -b 2048 -ub 2048 \
-  -t 8 -np 1 --fit off --port 9931 --reasoning off --load-mode mlock
+```text
+  Settings (strata-iq2_xs.json): --expert-cache auto --prefill auto --spec 4 --max-context 65536 --kv
+    int8 --kv-resident 32768 --pcie-frac 0.00 --spec-min-p 0.70 --adapt-every 1 --adapt-swaps 80
+    --adapt-decay 0.97; server 127.0.0.1:8080, gpu 0
+
 ```
 
 ```bash

@@ -348,6 +348,14 @@ class Toc:
         end = self.chapters[i + 1]["md_page"] - 1 if i + 1 < len(self.chapters) else self.n_pages
         return (start, end)
 
+    def page_window(self, start: int, end: int) -> str:
+        """按物理页码截取原始 Markdown，保留已有页标记。"""
+        start_marker = f"<!-- page {start} -->"
+        begin = self.text.index(start_marker)
+        next_marker = f"<!-- page {end + 1} -->"
+        finish = self.text.find(next_marker, begin + len(start_marker))
+        return self.text[begin : finish if finish != -1 else len(self.text)]
+
     def select_chapters(self, task: str) -> list[int]:
         listing = "\n".join(f'<chapter index="{index}">\n{chapter["title"]}\n</chapter>' for index, chapter in enumerate(self.chapters))
         prompt = textwrap.dedent(f"""

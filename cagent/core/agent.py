@@ -3,6 +3,7 @@ import logging
 import textwrap
 from datetime import datetime
 from pathlib import Path
+from time import perf_counter
 
 import requests
 
@@ -13,7 +14,7 @@ TRACE_DIR = Path("output/trace")
 
 
 class Agent:
-    def __init__(self, base_url: str = "http://localhost:9931/v1", model: str = "", trace: bool = False):
+    def __init__(self, base_url: str = "http://localhost:8080/v1", model: str = "", trace: bool = False):
         self.base_url = base_url
         self.model = model
         self.trace = trace
@@ -47,12 +48,17 @@ class Agent:
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": max_tokens or DEFAULT_MAX_TOKENS,
             "temperature": temperature,
+            "reasoning_effort": "none"
         }
         if schema is not None:
             data["response_format"] = {"type": "json_schema", "json_schema": {"name": "response", "schema": schema}}
 
+        started = perf_counter()
         response = requests.post(f"{self.base_url}/chat/completions", headers={"Content-Type": "application/json"}, json=data)
+        elapsed = perf_counter() - started
         if response.status_code >= 400:
+            if self.trace:
+                self._write_trace({"type": "model_error", "timestamp": datetime.now().isoformat(), "request": data, "status": response.status_code, "error": response.text, "elapsed_seconds": elapsed})
             raise RuntimeError(f"模型服务返回 {response.status_code}：{response.text[:400]}（prompt {len(prompt)} 字符，max_tokens {data['max_tokens']}）")
 
         response.raise_for_status()
@@ -61,7 +67,7 @@ class Agent:
         content = choice["message"]["content"]
 
         if self.trace:
-            self._trace(data, content)
+            self._write_trace({"type": "model_call", "timestamp": datetime.now().isoformat(), "request": data, "response": content, "finish_reason": choice.get("finish_reason"), "usage": body.get("usage"), "elapsed_seconds": elapsed})
         return content
 
     def chat_json(self, prompt: str, schema: dict, max_tokens: int | None = None, temperature: float = 0) -> dict:
@@ -107,11 +113,12 @@ class Agent:
                 break
         return result
 
-    def _trace(self, request: dict, content: str) -> None:
+    def trace_event(self, event: dict) -> None:
+        if self.trace:
+            self._write_trace(event)
+
+    def _write_trace(self, record: dict) -> None:
         TRACE_DIR.mkdir(parents=True, exist_ok=True)
-        record = {
-            "request": request,
-            "response": content,
-        }
+        record.setdefault("timestamp", datetime.now().isoformat())
         with open(TRACE_DIR / f"{self.session}.jsonl", "a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            f.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
